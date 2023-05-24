@@ -1,1 +1,5 @@
-./silent-disco-env
+silent-disco-env
+sandbox/song_snippets
+*.wav
+*.ipynbcheckpoints
+*.DS_Store
