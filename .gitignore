@@ -4,3 +4,4 @@ sandbox/song_snippets
 *.ipynbcheckpoints
 *.DS_Store
 *.cpython*
+config.py

@@ -4,7 +4,7 @@ import asyncio
 import ffmpeg
 
 
-async def shazam_test(audio_filepath):
+async def shazam_get_trackdata(audio_filepath):
     
     shazam = Shazam()
     alldata = await shazam.recognize_song(audio_filepath)
@@ -12,13 +12,12 @@ async def shazam_test(audio_filepath):
     if 'track' in alldata:
         # Get artist and track data
         trackdata = alldata['track']
-        trackid = trackdata['subtitle'] + " - " + trackdata['title']
+        track_string = trackdata['subtitle'] + " - " + trackdata['title']
 
-        print(trackdata)
-
-        return trackdata
+        return trackdata, track_string
     else:
         print("Song unidentified")
+        return "no_match", "no_match"
 
     
 

@@ -39,7 +39,7 @@ def record_audio(filename, duration):
     wf.writeframes(b''.join(frames))
     wf.close()
 
-    return "test succeeded. Check file at: "+ filename
+    return "Recording succeeded. Check file at: "+ filename
 
 
 
