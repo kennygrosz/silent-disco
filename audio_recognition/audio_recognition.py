@@ -7,7 +7,7 @@ import ffmpeg
 async def shazam_get_trackdata(audio_filepath):
     
     shazam = Shazam()
-    alldata = await shazam.recognize_song(audio_filepath)
+    alldata = await shazam.recognize(audio_filepath)
 
     if 'track' in alldata:
         # Get artist and track data

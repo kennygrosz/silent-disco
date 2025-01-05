@@ -13,7 +13,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import config
 from class_snippet import Snippet
-from spotipy_functions import search_song
+from spotipy_functions import search_song, is_interruption_allowed
 
 
 nest_asyncio.apply()
@@ -116,7 +116,7 @@ def start_loop():
     secret = config.secret
     scope = 'user-modify-playback-state user-read-playback-state'
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=cid, client_secret=secret,redirect_uri='https://github.com/kennygrosz/silent-disco', scope=scope))
-    default_device_id = '7421ca5ee7d4c4d2931813a7eac18183dd61aaa3'
+    default_device_id = '6078d94b3db63e070cf9b37a782f7ef06dbcc818'
 
     # save current queue
     pre_listen_queue = sp.queue()
@@ -190,6 +190,8 @@ def start_loop():
                     valid_snippet = False
                     print_log(log, "Song is  in last 5 songs of queue. Skipping.")
 
+            interruption_allowed_fl
+
 
         # 4. Queue Song
             if valid_snippet:
@@ -239,6 +241,7 @@ def start_loop():
 async def test_shazam():
     filepath = 'song_snippets/test_snippet_20230524_131852.wav' # the breeze - dr dog
     # filepath = 'song_snippets/test_snippet_20230524_132647.wav' #random shit
+    filepath = 'song_snippets_test/test_snippet_20250105_172611.wav' # Purge - Bas
 
 
     loop = asyncio.get_event_loop()
@@ -255,21 +258,25 @@ def test_spotify():
     scope = 'user-modify-playback-state user-read-playback-state'
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=cid, client_secret=secret,redirect_uri='https://github.com/kennygrosz/silent-disco', scope=scope))
 
+    print("------Printing List of Devices")
     print(sp.devices())
-    print(sp.current_playback())
     
     active_id = [i['id'] for i in sp.devices()["devices"] if i['supports_volume'] is True][0]
 
-    sp.transfer_playback(device_id = active_id, force_play = True)
-    
-    sp.start_playback(device_id=active_id, uris =['spotify:track:0UV5zxRMz6AO4ZwUOZNIKI'], position_ms=150000) 
-    sp.volume(40)
-    time.sleep(5)
-    sp.volume(0)
-    time.sleep(3)
-    sp.volume(40)
+    # sp.transfer_playback(device_id = active_id, force_play = True)
 
-    return "oaneroi"
+    # check if there is an active session
+    interruption_allowed_flag = is_interruption_allowed(sp)
+
+    if interruption_allowed_flag:
+        sp.start_playback(device_id=active_id, uris =['spotify:track:0UV5zxRMz6AO4ZwUOZNIKI'], position_ms=150000) 
+        sp.volume(40)
+        time.sleep(5)
+        sp.volume(0)
+        time.sleep(3)
+        sp.volume(40)
+
+    return "test completed"
 
 
 
