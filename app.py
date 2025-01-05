@@ -176,25 +176,43 @@ def start_loop():
 
 
         # 3. Is song queueable?
+
+            # Check if interruption is allowed
+
+            if valid_snippet:
+                print_log(log, "Checking if there is a current active spotify session to decide if interruption is permissible")
+
+                interruption_allowed_flag, return_message = is_interruption_allowed(sp)
+
+                if interruption_allowed_flag is True:
+                    print_log(log, return_message)
+
+                else: 
+                    print_log(log, "Interruption is not allowed. Reason below.")
+                    print_log(log, return_message)
+
+
+
             ## LOGIC: If song appears as one of the last 5 songs in the queue list, then don't add it
             last_5_songs = queue[-5:]
 
-            if valid_snippet:
+            if valid_snippet is True and interruption_allowed_flag is True:
                 # 3.1 Is song queueable?
                 if track_string not in last_5_songs:
                     queue.append(snip.track_string)
-                    print_log(log, "Song is not in last 5 songs of queue. Adding to queue")
+                    print_log(log, "Song is not in last 5 songs of silent disco queue history. Adding to queue")
                     snip.is_queuable = True
 
                 else:
                     valid_snippet = False
-                    print_log(log, "Song is  in last 5 songs of queue. Skipping.")
-
-            interruption_allowed_fl
+                    print_log(log, "Song is  in last 5 songs of silent disco queue history. Skipping...")
 
 
-        # 4. Queue Song
-            if valid_snippet:
+
+
+
+        # 4. Play song on Spotify
+            if valid_snippet is True and interruption_allowed_flag is True:
                 # Search song
                 print_log(log, "searching for song on spotify")
                 result = search_song(sp, snip.track_string)
@@ -213,8 +231,8 @@ def start_loop():
                     sp.transfer_playback(device_id = active_device_id, force_play = False)
                     print_log(log,"playing song on device id" + active_device_id)
                     sp.start_playback(device_id=active_device_id, uris =[snip.song_uri], position_ms=snip.duration_ms - 31000)
-                    sp.volume(40)
-                    time.sleep(2)
+                    # sp.volume(40)
+                    # time.sleep(2)
                     sp.volume(0)
                 except Exception as e:
                     print_log(log, "Cannot play song, with exception: "+ str(e))
