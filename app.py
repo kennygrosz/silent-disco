@@ -199,7 +199,6 @@ def start_loop():
             if valid_snippet is True and interruption_allowed_flag is True:
                 # 3.1 Is song queueable?
                 if track_string not in last_5_songs:
-                    queue.append(snip.track_string)
                     print_log(log, "Song is not in last 5 songs of silent disco queue history. Adding to queue")
                     snip.is_queuable = True
 
@@ -228,12 +227,16 @@ def start_loop():
                 # Play song
                 try:
                     active_device_id =  [i['id'] for i in sp.devices()["devices"] if i['supports_volume'] is True][0]
-                    sp.transfer_playback(device_id = active_device_id, force_play = False)
+                    sp.transfer_playback(device_id = active_device_id, force_play = True)
                     print_log(log,"playing song on device id" + active_device_id)
                     sp.start_playback(device_id=active_device_id, uris =[snip.song_uri], position_ms=snip.duration_ms - 31000)
                     # sp.volume(40)
                     # time.sleep(2)
                     sp.volume(0)
+
+                    #add to queue
+                    queue.append(snip.track_string)
+
                 except Exception as e:
                     print_log(log, "Cannot play song, with exception: "+ str(e))
                     valid_snippet = False 
@@ -279,9 +282,11 @@ def test_spotify():
     print("------Printing List of Devices")
     print(sp.devices())
     
-    active_id = [i['id'] for i in sp.devices()["devices"] if i['supports_volume'] is True][0]
+    #active_id = [i['id'] for i in sp.devices()["devices"] if i['supports_volume'] is True][0]
+    default_device_id = '6078d94b3db63e070cf9b37a782f7ef06dbcc818'
+    active_id = default_device_id
 
-    # sp.transfer_playback(device_id = active_id, force_play = True)
+    #sp.transfer_playback(device_id = default_device_id, force_play = False)
 
     # check if there is an active session
     interruption_allowed_flag = is_interruption_allowed(sp)
