@@ -1,4 +1,20 @@
-#requirements.txt
+# requirements.txt
 
+# Web framework
 Flask==2.0.2
 
+# Spotify integration
+spotipy==2.23.0
+
+# Audio recognition
+shazamio==0.4.0.1
+
+# Audio recording
+PyAudio==0.2.13
+
+# Async support
+asyncio==3.4.3
+nest-asyncio==1.5.6
+
+# Configuration
+python-dotenv==1.0.0

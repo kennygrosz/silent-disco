@@ -1,14 +1,20 @@
-
-import requests
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
-
-
 def search_song(sp, song_info):
-    
-    search_str = song_info
-    result = sp.search(search_str, type = 'track')
-    # song_id = result["tracks"]['items'][0]['id'] #pick first result
+    """Search for a song on Spotify.
 
-    
-    return result["tracks"]['items'][0]
+    Args:
+        sp: Spotify client instance
+        song_info: Search query string
+
+    Returns:
+        First track result or None if no matches found
+    """
+    search_str = song_info
+    result = sp.search(search_str, type='track', limit=1)
+
+    # Safely get items with error handling
+    items = result.get("tracks", {}).get('items', [])
+
+    if not items:
+        return None
+
+    return items[0]

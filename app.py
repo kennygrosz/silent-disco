@@ -20,6 +20,62 @@ nest_asyncio.apply()
 
 app = Flask(__name__)
 
+
+def get_and_activate_spotify_device(sp, preferred_name=None):
+    """Find and activate a Spotify device, preferring the specified device name.
+
+    Args:
+        sp: Spotify client instance
+        preferred_name: Preferred device name (e.g., "Kenny's MacBook Air")
+
+    Returns:
+        tuple: (device_id, device_name) or (None, None) if no devices found
+    """
+    try:
+        devices_response = sp.devices()
+        devices = devices_response.get("devices", [])
+
+        if not devices:
+            print(f"No Spotify devices found. Please open Spotify on a device.")
+            return None, None
+
+        # Filter devices with volume control
+        volume_devices = [d for d in devices if d.get('supports_volume', False)]
+
+        if not volume_devices:
+            print(f"No devices with volume control found.")
+            return None, None
+
+        # Try to find preferred device by name
+        if preferred_name:
+            preferred = next((d for d in volume_devices if preferred_name in d.get('name', '')), None)
+            if preferred:
+                device_id = preferred['id']
+                device_name = preferred['name']
+                # Activate the device (even if not currently playing)
+                sp.transfer_playback(device_id=device_id, force_play=False)
+                print(f"Activated preferred device: {device_name}")
+                return device_id, device_name
+
+        # Fallback: use active device or first available
+        active = next((d for d in volume_devices if d.get('is_active')), None)
+        if active:
+            device_id = active['id']
+            device_name = active['name']
+        else:
+            # No active device, activate the first one
+            device_id = volume_devices[0]['id']
+            device_name = volume_devices[0]['name']
+            sp.transfer_playback(device_id=device_id, force_play=False)
+            print(f"Activated device: {device_name}")
+
+        return device_id, device_name
+
+    except Exception as e:
+        print(f"Error getting Spotify device: {e}")
+        return None, None
+
+
 @app.route('/')
 def index():
     return 'Flask app is running'
@@ -146,11 +202,11 @@ def start_loop():
             status = record_audio(snip.snippet_filepath, snip.snippet_duration)
             snip.is_recorded = True
             print(status)
-            print_log(log, "Recording completed with status: "+ status)
-        except Exception as e: 
-            print_log(log, "Recording failed with exception: "+ e)
+            print_log(log, f"Recording completed with status: {status}")
+        except Exception as e:
+            print_log(log, f"Recording failed with exception: {str(e)}")
             valid_snippet = False
-            return log
+            continue  # Skip to next iteration instead of exiting
         
         # 2. Process song with Shazamio to try to recognize it
         if valid_snippet:
@@ -170,9 +226,9 @@ def start_loop():
                     print_log(log, "Snippet is recognized. Track String ="+snip.track_string)
 
             except Exception as e:
-                print_log(log, "Recognition failed with exception: "+ e)
-                valid_snippet = False 
-                return log     
+                print_log(log, f"Recognition failed with exception: {str(e)}")
+                valid_snippet = False
+                continue  # Skip to next iteration instead of exiting     
 
 
         # 3. Is song queueable?
@@ -194,8 +250,14 @@ def start_loop():
         # 4. Queue Song
             if valid_snippet:
                 # Search song
-                print_log(log, "searching for song on spotify")
+                print_log(log, "Searching for song on Spotify")
                 result = search_song(sp, snip.track_string)
+
+                if result is None:
+                    print_log(log, f"Song not found on Spotify: {snip.track_string}")
+                    valid_snippet = False
+                    continue
+
                 snip.song_id = result['id']
                 snip.song_uri = result['uri']
                 snip.song_name = result['name']
@@ -203,29 +265,53 @@ def start_loop():
                 snip.duration_ms = result['duration_ms']
 
                 # Result
-                print_log(log, "Found song: "+ snip.song_name + "- "+snip.song_artist)
+                print_log(log, f"Found song: {snip.song_name} - {snip.song_artist}")
 
                 # Play song
                 try:
-                    active_device_id =  [i['id'] for i in sp.devices()["devices"] if i['supports_volume'] is True][0]
-                    sp.transfer_playback(device_id = active_device_id, force_play = False)
-                    print_log(log,"playing song on device id" + active_device_id)
-                    sp.start_playback(device_id=active_device_id, uris =[snip.song_uri], position_ms=snip.duration_ms - 31000)
-                    sp.volume(40)
-                    time.sleep(2)
-                    sp.volume(0)
+                    # Get and activate preferred device
+                    active_device_id, device_name = get_and_activate_spotify_device(
+                        sp,
+                        preferred_name=config.app_config.preferred_device_name
+                    )
+
+                    if not active_device_id:
+                        print_log(log, "No Spotify devices available - skipping playback")
+                        valid_snippet = False
+                        continue
+
+                    print_log(log, f"Playing song on device: {device_name}")
+
+                    # Calculate safe position (prevent negative position_ms)
+                    # Play last 31 seconds of the song
+                    position_ms = max(0, snip.duration_ms - config.app_config.playback_offset_ms)
+
+                    sp.start_playback(
+                        device_id=active_device_id,
+                        uris=[snip.song_uri],
+                        position_ms=position_ms
+                    )
+
+                    # Always keep volume at 0 (silent playback)
+                    sp.volume(0, device_id=active_device_id)
+
                 except Exception as e:
-                    print_log(log, "Cannot play song, with exception: "+ str(e))
-                    valid_snippet = False 
-                    # return log     
+                    print_log(log, f"Cannot play song, with exception: {str(e)}")
+                    valid_snippet = False
+                    # Continue to next iteration     
 
         # Update counter and sleep if there will be more loops
         cnt += 1
-        if total_recording_time == None:
-            total_loops += 1
-        if cnt <= total_loops:
-            # sleep until next loop
-            time.sleep(interval_duration-snippet_duration) ## FIX THIS TO REMOVE PROCESSING TIME FOR OTHER STEPS IN THE PROCESS
+
+        # Check if we should continue (time-based or infinite mode)
+        should_continue = True
+        if total_recording_time is not None:
+            should_continue = cnt <= total_loops
+        # If total_recording_time is None, loop runs indefinitely (should_continue stays True)
+
+        if should_continue:
+            # Calculate sleep time (accounting for processing time in future)
+            time.sleep(interval_duration - snippet_duration)
 
     return log
 
@@ -249,30 +335,58 @@ async def test_shazam():
 
 @app.route('/test_spotify')
 def test_spotify():
-    base_url = 'https://api.spotify.com'
-    cid = config.cid
-    secret = config.secret
-    scope = 'user-modify-playback-state user-read-playback-state'
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=cid, client_secret=secret,redirect_uri='https://github.com/kennygrosz/silent-disco', scope=scope))
+    """Test Spotify connection with auto-activation of preferred device."""
+    try:
+        cid = config.cid
+        secret = config.secret
+        scope = 'user-modify-playback-state user-read-playback-state'
+        sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+            client_id=cid,
+            client_secret=secret,
+            redirect_uri='https://github.com/kennygrosz/silent-disco',
+            scope=scope
+        ))
 
-    print(sp.devices())
-    print(sp.current_playback())
-    
-    active_id = [i['id'] for i in sp.devices()["devices"] if i['supports_volume'] is True][0]
+        # Get and activate preferred device
+        device_id, device_name = get_and_activate_spotify_device(
+            sp,
+            preferred_name=config.app_config.preferred_device_name
+        )
 
-    sp.transfer_playback(device_id = active_id, force_play = True)
-    
-    sp.start_playback(device_id=active_id, uris =['spotify:track:0UV5zxRMz6AO4ZwUOZNIKI'], position_ms=150000) 
-    sp.volume(40)
-    time.sleep(5)
-    sp.volume(0)
-    time.sleep(3)
-    sp.volume(40)
+        if not device_id:
+            return {
+                "status": "error",
+                "message": "No Spotify devices found. Please open Spotify on any device.",
+                "preferred_device": config.app_config.preferred_device_name
+            }, 404
 
-    return "oaneroi"
+        # Start playback test
+        sp.start_playback(
+            device_id=device_id,
+            uris=['spotify:track:0UV5zxRMz6AO4ZwUOZNIKI'],
+            position_ms=150000
+        )
+
+        # Always keep volume at 0 (silent playback)
+        sp.volume(0, device_id=device_id)
+
+        return {
+            "status": "success",
+            "message": "Spotify playback test successful!",
+            "device_used": device_name,
+            "preferred_device": config.app_config.preferred_device_name,
+            "was_auto_activated": True
+        }, 200
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Spotify test failed: {str(e)}",
+            "error_type": type(e).__name__
+        }, 500
 
 
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=False, host='0.0.0.0', port=5001)
