@@ -6,3 +6,4 @@ sandbox/song_snippets
 *.cpython*
 .env
 .cache
+logs/

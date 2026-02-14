@@ -14,6 +14,14 @@ from spotipy.oauth2 import SpotifyOAuth
 import config
 from class_snippet import Snippet
 from spotipy_functions import search_song, is_interruption_allowed
+from utils.logging_config import LogCollector, get_logger
+from utils.validators import (
+    validate_duration,
+    validate_interval,
+    validate_spotify_track,
+    validate_directory_path,
+    ValidationError
+)
 
 
 nest_asyncio.apply()
@@ -123,32 +131,38 @@ def listener_test():
 def start_loop():
 
     ######
-    # INITIALIZATION 
+    # INITIALIZATION
     #####
 
-    # Initialize log
-    log = []
-    def print_log(log, msg):
-        logtime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(logtime+" |\t"+msg)
-        log.append(logtime+"\t"+msg)
-        return
-
-    print_log(log, "Initializing variables")
+    # Initialize logging with new LogCollector
+    log_collector = LogCollector()
+    log_collector.info("Initializing variables")
 
     # Define parameters
     ### Snippet params
-    snippet_duration = 10 #seconds
-    interval_duration = 60 #seconds
-    total_recording_time = None #if this is a number, then the recording will stop after a specificed number of seconds
+    snippet_duration = 10  # seconds
+    interval_duration = 60  # seconds
+    total_recording_time = None  # if this is a number, then the recording will stop after a specified number of seconds
+
+    # Validate parameters
+    try:
+        snippet_duration = validate_duration(snippet_duration, min_seconds=1, max_seconds=300)
+        interval_duration = validate_interval(interval_duration, snippet_duration)
+        log_collector.info(f"Validated parameters - snippet: {snippet_duration}s, interval: {interval_duration}s")
+    except ValidationError as e:
+        log_collector.error(f"Parameter validation failed: {e}")
+        return log_collector.get_logs()
+
     total_loops = int(total_recording_time / interval_duration) if total_recording_time is not None else 1
-    
-    # total_loops = 0 #remember to remove
 
     ### File / Name information
     output_folder = 'song_snippets'
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    try:
+        output_folder = validate_directory_path(output_folder, create_if_missing=True)
+        log_collector.info(f"Output directory validated: {output_folder}")
+    except ValidationError as e:
+        log_collector.error(f"Output directory validation failed: {e}")
+        return log_collector.get_logs()
 
     ### Create data structure for storing songs
     all_snippets_list = []
@@ -165,7 +179,7 @@ def start_loop():
     queue = []
     
     ### Connect to Spotify API
-    print_log(log, "Connecting to Spotify API")
+    log_collector.info("Connecting to Spotify API")
 
     base_url = 'https://api.spotify.com'
     cid = config.cid
@@ -183,51 +197,51 @@ def start_loop():
     cnt=0
     should_continue = True
 
-    print_log(log, "Beginning loop, Iteration = "+str(cnt))
+    log_collector.info("Beginning loop, Iteration = "+str(cnt))
 
 
     while should_continue:
         valid_snippet = True
         interruption_allowed_flag = False  # Initialize
 
-        print_log(log, "Loop, Iteration = "+str(cnt))
+        log_collector.info("Loop, Iteration = "+str(cnt))
 
         # 0. Initialize snippet
         snip = Snippet(output_folder, snippet_duration=snippet_duration)
 
-        print_log(log, "Initialized Snippet at:"+snip.snippet_filepath)
+        log_collector.info("Initialized Snippet at:"+snip.snippet_filepath)
 
         # 1. Record and store snippet
-        print_log(log, "Recording snippet: "+snip.filename_str)
+        log_collector.info("Recording snippet: "+snip.filename_str)
         try:
             status = record_audio(snip.snippet_filepath, snip.snippet_duration)
             snip.is_recorded = True
             print(status)
-            print_log(log, f"Recording completed with status: {status}")
+            log_collector.info(f"Recording completed with status: {status}")
         except Exception as e:
-            print_log(log, f"Recording failed with exception: {str(e)}")
+            log_collector.error(f"Recording failed with exception: {str(e)}")
             valid_snippet = False
             continue  # Skip to next iteration instead of exiting
         
         # 2. Process song with Shazamio to try to recognize it
         if valid_snippet:
-            print_log(log, "Processing snippet with shazamio")
+            log_collector.info("Processing snippet with shazamio")
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
                 trackdata, track_string = loop.run_until_complete(shazam_get_trackdata(snip.snippet_filepath))
                 
                 if track_string == "no_match":
-                    print_log(log, "Snippet is unrecognizeable")
+                    log_collector.info("Snippet is unrecognizeable")
                     valid_snippet = False 
                     snip.track_string = "unrecognized"
                 else:
                     snip.is_recognized = True
                     snip.track_string = track_string
-                    print_log(log, f"Snippet is recognized. Track String = {snip.track_string}")
+                    log_collector.info(f"Snippet is recognized. Track String = {snip.track_string}")
 
             except Exception as e:
-                print_log(log, f"Recognition failed with exception: {str(e)}")
+                log_collector.error(f"Recognition failed with exception: {str(e)}")
                 valid_snippet = False
                 continue  # Skip to next iteration instead of exiting
             finally:
@@ -236,15 +250,15 @@ def start_loop():
 
         # 3. Check if interruption is allowed and if song is queueable
         if valid_snippet:
-            print_log(log, "Checking if there is a current active spotify session to decide if interruption is permissible")
+            log_collector.info("Checking if there is a current active spotify session to decide if interruption is permissible")
 
             interruption_allowed_flag, return_message = is_interruption_allowed(sp)
 
             if interruption_allowed_flag is True:
-                print_log(log, return_message)
+                log_collector.info(return_message)
             else: 
-                print_log(log, "Interruption is not allowed. Reason below.")
-                print_log(log, return_message)
+                log_collector.info("Interruption is not allowed. Reason below.")
+                log_collector.info(return_message)
 
         ## LOGIC: If song appears as one of the last 5 songs in the queue list, then don't add it
         last_5_songs = queue[-5:]
@@ -252,21 +266,29 @@ def start_loop():
         if valid_snippet is True and interruption_allowed_flag is True:
             # 3.1 Is song queueable?
             if track_string not in last_5_songs:
-                print_log(log, "Song is not in last 5 songs of silent disco queue history.")
+                log_collector.info("Song is not in last 5 songs of silent disco queue history.")
                 snip.is_queuable = True
             else:
                 valid_snippet = False
-                print_log(log, "Song is in last 5 songs of silent disco queue history. Skipping...")
+                log_collector.info("Song is in last 5 songs of silent disco queue history. Skipping...")
 
 
         # 4. Play song on Spotify
         if valid_snippet is True and interruption_allowed_flag is True:
             # Search song
-            print_log(log, "Searching for song on Spotify")
+            log_collector.info("Searching for song on Spotify")
             result = search_song(sp, snip.track_string)
 
             if result is None:
-                print_log(log, f"Song not found on Spotify: {snip.track_string}")
+                log_collector.info(f"Song not found on Spotify: {snip.track_string}")
+                valid_snippet = False
+                continue
+
+            # Validate Spotify track data
+            try:
+                result = validate_spotify_track(result)
+            except ValidationError as e:
+                log_collector.error(f"Invalid Spotify track data: {e}")
                 valid_snippet = False
                 continue
 
@@ -277,7 +299,7 @@ def start_loop():
             snip.duration_ms = result['duration_ms']
 
             # Result
-            print_log(log, f"Found song: {snip.song_name} - {snip.song_artist}")
+            log_collector.info(f"Found song: {snip.song_name} - {snip.song_artist}")
 
             # Play song
             try:
@@ -288,11 +310,11 @@ def start_loop():
                 )
 
                 if not active_device_id:
-                    print_log(log, "No Spotify devices available - skipping playback")
+                    log_collector.info("No Spotify devices available - skipping playback")
                     valid_snippet = False
                     continue
 
-                print_log(log, f"Playing song on device: {device_name}")
+                log_collector.info(f"Playing song on device: {device_name}")
 
                 # Calculate safe position (prevent negative position_ms)
                 # Play last 31 seconds of the song
@@ -309,10 +331,10 @@ def start_loop():
 
                 # Add to queue AFTER successful playback
                 queue.append(snip.track_string)
-                print_log(log, "Successfully played and added to queue")
+                log_collector.info("Successfully played and added to queue")
 
             except Exception as e:
-                print_log(log, f"Cannot play song, with exception: {str(e)}")
+                log_collector.error(f"Cannot play song, with exception: {str(e)}")
                 valid_snippet = False
                 # Continue to next iteration
 
@@ -328,7 +350,7 @@ def start_loop():
             # Calculate sleep time (accounting for processing time in future)
             time.sleep(interval_duration - snippet_duration)
 
-    return log
+    return log_collector.get_logs()
 
 
 # This route is accessible at [IP_ADDRESS]:5000/test_shazam
