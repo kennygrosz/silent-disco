@@ -13,7 +13,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import config
 from class_snippet import Snippet
-from spotipy_functions import search_song
+from spotipy_functions import search_song, is_interruption_allowed
 
 
 nest_asyncio.apply()
@@ -113,7 +113,7 @@ def listener_test():
         return snippet_filepath
     except Exception as e: 
         print(e)
-        return e
+        return str(e)
 
 # This route is accessible at [IP_ADDRESS]:5000/start_loop
 # Functionality:
@@ -187,7 +187,7 @@ def start_loop():
 
     while cnt <= total_loops:
         valid_snippet = True
-
+        interruption_allowed_flag = False  # Initialize
 
         print_log(log, "Loop, Iteration = "+str(cnt))
 
@@ -223,82 +223,97 @@ def start_loop():
                 else:
                     snip.is_recognized = True
                     snip.track_string = track_string
-                    print_log(log, "Snippet is recognized. Track String ="+snip.track_string)
+                    print_log(log, f"Snippet is recognized. Track String = {snip.track_string}")
 
             except Exception as e:
                 print_log(log, f"Recognition failed with exception: {str(e)}")
                 valid_snippet = False
-                continue  # Skip to next iteration instead of exiting     
+                continue  # Skip to next iteration instead of exiting
+            finally:
+                loop.close()
 
 
-        # 3. Is song queueable?
-            ## LOGIC: If song appears as one of the last 5 songs in the queue list, then don't add it
-            last_5_songs = queue[-5:]
+        # 3. Check if interruption is allowed and if song is queueable
+        if valid_snippet:
+            print_log(log, "Checking if there is a current active spotify session to decide if interruption is permissible")
 
-            if valid_snippet:
-                # 3.1 Is song queueable?
-                if track_string not in last_5_songs:
-                    queue.append(snip.track_string)
-                    print_log(log, "Song is not in last 5 songs of queue. Adding to queue")
-                    snip.is_queuable = True
+            interruption_allowed_flag, return_message = is_interruption_allowed(sp)
 
-                else:
-                    valid_snippet = False
-                    print_log(log, "Song is  in last 5 songs of queue. Skipping.")
+            if interruption_allowed_flag is True:
+                print_log(log, return_message)
+            else: 
+                print_log(log, "Interruption is not allowed. Reason below.")
+                print_log(log, return_message)
+
+        ## LOGIC: If song appears as one of the last 5 songs in the queue list, then don't add it
+        last_5_songs = queue[-5:]
+
+        if valid_snippet is True and interruption_allowed_flag is True:
+            # 3.1 Is song queueable?
+            if track_string not in last_5_songs:
+                print_log(log, "Song is not in last 5 songs of silent disco queue history.")
+                snip.is_queuable = True
+            else:
+                valid_snippet = False
+                print_log(log, "Song is in last 5 songs of silent disco queue history. Skipping...")
 
 
-        # 4. Queue Song
-            if valid_snippet:
-                # Search song
-                print_log(log, "Searching for song on Spotify")
-                result = search_song(sp, snip.track_string)
+        # 4. Play song on Spotify
+        if valid_snippet is True and interruption_allowed_flag is True:
+            # Search song
+            print_log(log, "Searching for song on Spotify")
+            result = search_song(sp, snip.track_string)
 
-                if result is None:
-                    print_log(log, f"Song not found on Spotify: {snip.track_string}")
+            if result is None:
+                print_log(log, f"Song not found on Spotify: {snip.track_string}")
+                valid_snippet = False
+                continue
+
+            snip.song_id = result['id']
+            snip.song_uri = result['uri']
+            snip.song_name = result['name']
+            snip.song_artist = result['artists'][0]['name']
+            snip.duration_ms = result['duration_ms']
+
+            # Result
+            print_log(log, f"Found song: {snip.song_name} - {snip.song_artist}")
+
+            # Play song
+            try:
+                # Get and activate preferred device
+                active_device_id, device_name = get_and_activate_spotify_device(
+                    sp,
+                    preferred_name=config.app_config.preferred_device_name
+                )
+
+                if not active_device_id:
+                    print_log(log, "No Spotify devices available - skipping playback")
                     valid_snippet = False
                     continue
 
-                snip.song_id = result['id']
-                snip.song_uri = result['uri']
-                snip.song_name = result['name']
-                snip.song_artist = result['artists'][0]['name']
-                snip.duration_ms = result['duration_ms']
+                print_log(log, f"Playing song on device: {device_name}")
 
-                # Result
-                print_log(log, f"Found song: {snip.song_name} - {snip.song_artist}")
+                # Calculate safe position (prevent negative position_ms)
+                # Play last 31 seconds of the song
+                position_ms = max(0, snip.duration_ms - config.app_config.playback_offset_ms)
 
-                # Play song
-                try:
-                    # Get and activate preferred device
-                    active_device_id, device_name = get_and_activate_spotify_device(
-                        sp,
-                        preferred_name=config.app_config.preferred_device_name
-                    )
+                sp.start_playback(
+                    device_id=active_device_id,
+                    uris=[snip.song_uri],
+                    position_ms=position_ms
+                )
 
-                    if not active_device_id:
-                        print_log(log, "No Spotify devices available - skipping playback")
-                        valid_snippet = False
-                        continue
+                # Always keep volume at 0 (silent playback)
+                sp.volume(0, device_id=active_device_id)
 
-                    print_log(log, f"Playing song on device: {device_name}")
+                # Add to queue AFTER successful playback
+                queue.append(snip.track_string)
+                print_log(log, "Successfully played and added to queue")
 
-                    # Calculate safe position (prevent negative position_ms)
-                    # Play last 31 seconds of the song
-                    position_ms = max(0, snip.duration_ms - config.app_config.playback_offset_ms)
-
-                    sp.start_playback(
-                        device_id=active_device_id,
-                        uris=[snip.song_uri],
-                        position_ms=position_ms
-                    )
-
-                    # Always keep volume at 0 (silent playback)
-                    sp.volume(0, device_id=active_device_id)
-
-                except Exception as e:
-                    print_log(log, f"Cannot play song, with exception: {str(e)}")
-                    valid_snippet = False
-                    # Continue to next iteration     
+            except Exception as e:
+                print_log(log, f"Cannot play song, with exception: {str(e)}")
+                valid_snippet = False
+                # Continue to next iteration
 
         # Update counter and sleep if there will be more loops
         cnt += 1
@@ -314,8 +329,6 @@ def start_loop():
             time.sleep(interval_duration - snippet_duration)
 
     return log
-
-    return "Snippets complete"
 
 
 # This route is accessible at [IP_ADDRESS]:5000/test_shazam

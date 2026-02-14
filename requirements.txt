@@ -1,20 +1,50 @@
-# requirements.txt
-
-# Web framework
-Flask==2.0.2
-
-# Spotify integration
-spotipy==2.23.0
-
-# Audio recognition
-shazamio==0.4.0.1
-
-# Audio recording
-PyAudio==0.2.13
-
-# Async support
+aiofiles==23.2.1
+aiohappyeyeballs==2.4.4
+aiohttp==3.11.11
+aiohttp-retry==2.9.1
+aiosignal==1.3.2
+annotated-types==0.7.0
+anyio==4.3.0
+asgiref==3.8.1
 asyncio==3.4.3
-nest-asyncio==1.5.6
-
-# Configuration
+attrs==24.3.0
+blinker==1.9.0
+certifi==2024.12.14
+charset-normalizer==3.4.1
+click==8.1.8
+dataclass-factory==2.16
+ffmpeg==1.4
+ffprobe==0.5
+Flask==3.1.0
+frozenlist==1.5.0
+idna==3.10
+iniconfig==2.0.0
+itsdangerous==2.2.0
+Jinja2==3.1.5
+MarkupSafe==3.0.2
+multidict==6.1.0
+nest-asyncio==1.6.0
+numpy==2.1.2
+packaging==24.2
+pluggy==1.5.0
+propcache==0.2.1
+PyAudio==0.2.14
+pydantic==2.9.2
+pydantic_core==2.23.4
+pydub==0.25.1
+pytest==7.4.4
+pytest-asyncio==0.20.3
 python-dotenv==1.0.0
+redis==5.2.1
+requests==2.32.3
+setuptools==75.1.0
+shazamio==0.7.0
+shazamio_core @ file:///Users/kenny-groszman/Desktop/silent-disco/shazamio-core
+sniffio==1.3.1
+spotipy==2.25.0
+typing_extensions==4.12.2
+urllib3==2.3.0
+Wave==0.0.2
+Werkzeug==3.1.3
+wheel==0.44.0
+yarl==1.18.3
