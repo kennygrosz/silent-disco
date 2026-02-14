@@ -1,87 +1,22 @@
 from flask import Flask
-import pyaudio
-import wave
 import os
 from listener.listener import record_audio
-from audio_recognition.audio_recognition import shazam_get_trackdata
 from datetime import datetime
 import time
-import asyncio
-import nest_asyncio
-import requests
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 import config
-from class_snippet import Snippet
-from spotipy_functions import search_song, is_interruption_allowed
-from utils.logging_config import LogCollector, get_logger
+from models.snippet import Snippet
+from services.spotify_service import SpotifyService
+from services.recognition_service import RecognitionService
+from utils.logging_config import LogCollector
 from utils.validators import (
     validate_duration,
     validate_interval,
-    validate_spotify_track,
     validate_directory_path,
     ValidationError
 )
 
 
-nest_asyncio.apply()
-
 app = Flask(__name__)
-
-
-def get_and_activate_spotify_device(sp, preferred_name=None):
-    """Find and activate a Spotify device, preferring the specified device name.
-
-    Args:
-        sp: Spotify client instance
-        preferred_name: Preferred device name (e.g., "Kenny's MacBook Air")
-
-    Returns:
-        tuple: (device_id, device_name) or (None, None) if no devices found
-    """
-    try:
-        devices_response = sp.devices()
-        devices = devices_response.get("devices", [])
-
-        if not devices:
-            print(f"No Spotify devices found. Please open Spotify on a device.")
-            return None, None
-
-        # Filter devices with volume control
-        volume_devices = [d for d in devices if d.get('supports_volume', False)]
-
-        if not volume_devices:
-            print(f"No devices with volume control found.")
-            return None, None
-
-        # Try to find preferred device by name
-        if preferred_name:
-            preferred = next((d for d in volume_devices if preferred_name in d.get('name', '')), None)
-            if preferred:
-                device_id = preferred['id']
-                device_name = preferred['name']
-                # Activate the device (even if not currently playing)
-                sp.transfer_playback(device_id=device_id, force_play=False)
-                print(f"Activated preferred device: {device_name}")
-                return device_id, device_name
-
-        # Fallback: use active device or first available
-        active = next((d for d in volume_devices if d.get('is_active')), None)
-        if active:
-            device_id = active['id']
-            device_name = active['name']
-        else:
-            # No active device, activate the first one
-            device_id = volume_devices[0]['id']
-            device_name = volume_devices[0]['name']
-            sp.transfer_playback(device_id=device_id, force_play=False)
-            print(f"Activated device: {device_name}")
-
-        return device_id, device_name
-
-    except Exception as e:
-        print(f"Error getting Spotify device: {e}")
-        return None, None
 
 
 @app.route('/')
@@ -178,18 +113,22 @@ def start_loop():
     }
     queue = []
     
-    ### Connect to Spotify API
-    log_collector.info("Connecting to Spotify API")
+    ### Initialize services
+    log_collector.info("Initializing Spotify and Recognition services")
 
-    base_url = 'https://api.spotify.com'
-    cid = config.cid
-    secret = config.secret
-    scope = 'user-modify-playback-state user-read-playback-state'
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=cid, client_secret=secret,redirect_uri='https://github.com/kennygrosz/silent-disco', scope=scope))
-    default_device_id = '7421ca5ee7d4c4d2931813a7eac18183dd61aaa3'
+    # Create Spotify service
+    spotify_service = SpotifyService(
+        client_id=config.cid,
+        client_secret=config.secret,
+        redirect_uri='https://github.com/kennygrosz/silent-disco',
+        scope='user-modify-playback-state user-read-playback-state'
+    )
 
-    # save current queue
-    pre_listen_queue = sp.queue()
+    # Create Recognition service
+    recognition_service = RecognitionService()
+
+    # Save current queue
+    pre_listen_queue = spotify_service.get_queue()
 
     ######
     # LOOP  
@@ -207,56 +146,53 @@ def start_loop():
         log_collector.info("Loop, Iteration = "+str(cnt))
 
         # 0. Initialize snippet
-        snip = Snippet(output_folder, snippet_duration=snippet_duration)
+        snip = Snippet(output_folder=output_folder, snippet_duration=snippet_duration)
 
-        log_collector.info("Initialized Snippet at:"+snip.snippet_filepath)
+        log_collector.info(f"Initialized Snippet at: {snip.filepath_str}")
 
         # 1. Record and store snippet
-        log_collector.info("Recording snippet: "+snip.filename_str)
+        log_collector.info(f"Recording snippet: {snip.filename}")
         try:
-            status = record_audio(snip.snippet_filepath, snip.snippet_duration)
-            snip.is_recorded = True
+            status = record_audio(snip.filepath_str, snip.snippet_duration)
+            snip.mark_recorded()
             print(status)
             log_collector.info(f"Recording completed with status: {status}")
         except Exception as e:
             log_collector.error(f"Recording failed with exception: {str(e)}")
+            snip.mark_failed()
             valid_snippet = False
             continue  # Skip to next iteration instead of exiting
         
-        # 2. Process song with Shazamio to try to recognize it
+        # 2. Process song with Recognition service
         if valid_snippet:
-            log_collector.info("Processing snippet with shazamio")
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            log_collector.info("Processing snippet with Shazam")
             try:
-                trackdata, track_string = loop.run_until_complete(shazam_get_trackdata(snip.snippet_filepath))
-                
-                if track_string == "no_match":
-                    log_collector.info("Snippet is unrecognizeable")
-                    valid_snippet = False 
-                    snip.track_string = "unrecognized"
+                recognized_track = recognition_service.recognize(snip.filepath_str)
+
+                if recognized_track is None:
+                    log_collector.info("Snippet is unrecognizable")
+                    snip.mark_unrecognized()
+                    valid_snippet = False
                 else:
-                    snip.is_recognized = True
-                    snip.track_string = track_string
+                    snip.mark_recognized(recognized_track.track_string)
                     log_collector.info(f"Snippet is recognized. Track String = {snip.track_string}")
 
             except Exception as e:
                 log_collector.error(f"Recognition failed with exception: {str(e)}")
+                snip.mark_failed()
                 valid_snippet = False
                 continue  # Skip to next iteration instead of exiting
-            finally:
-                loop.close()
 
 
         # 3. Check if interruption is allowed and if song is queueable
         if valid_snippet:
-            log_collector.info("Checking if there is a current active spotify session to decide if interruption is permissible")
+            log_collector.info("Checking if interruption is permissible")
 
-            interruption_allowed_flag, return_message = is_interruption_allowed(sp)
+            interruption_allowed_flag, return_message = spotify_service.is_interruption_allowed()
 
             if interruption_allowed_flag is True:
                 log_collector.info(return_message)
-            else: 
+            else:
                 log_collector.info("Interruption is not allowed. Reason below.")
                 log_collector.info(return_message)
 
@@ -265,9 +201,9 @@ def start_loop():
 
         if valid_snippet is True and interruption_allowed_flag is True:
             # 3.1 Is song queueable?
-            if track_string not in last_5_songs:
+            if snip.track_string not in last_5_songs:
                 log_collector.info("Song is not in last 5 songs of silent disco queue history.")
-                snip.is_queuable = True
+                snip.mark_queueable()
             else:
                 valid_snippet = False
                 log_collector.info("Song is in last 5 songs of silent disco queue history. Skipping...")
@@ -275,68 +211,57 @@ def start_loop():
 
         # 4. Play song on Spotify
         if valid_snippet is True and interruption_allowed_flag is True:
-            # Search song
+            # Search song using Spotify service
             log_collector.info("Searching for song on Spotify")
-            result = search_song(sp, snip.track_string)
+            spotify_track = spotify_service.search_track(snip.track_string)
 
-            if result is None:
+            if spotify_track is None:
                 log_collector.info(f"Song not found on Spotify: {snip.track_string}")
                 valid_snippet = False
                 continue
 
-            # Validate Spotify track data
-            try:
-                result = validate_spotify_track(result)
-            except ValidationError as e:
-                log_collector.error(f"Invalid Spotify track data: {e}")
+            # Store Spotify track information
+            snip.set_spotify_info(
+                song_id=spotify_track.id,
+                song_uri=spotify_track.uri,
+                song_name=spotify_track.name,
+                song_artist=spotify_track.artist,
+                duration_ms=spotify_track.duration_ms
+            )
+
+            log_collector.info(f"Found song: {snip.song_name} - {snip.song_artist}")
+
+            # Get and activate preferred device
+            active_device_id, device_name = spotify_service.get_and_activate_device(
+                preferred_name=config.app_config.preferred_device_name
+            )
+
+            if not active_device_id:
+                log_collector.info("No Spotify devices available - skipping playback")
                 valid_snippet = False
                 continue
 
-            snip.song_id = result['id']
-            snip.song_uri = result['uri']
-            snip.song_name = result['name']
-            snip.song_artist = result['artists'][0]['name']
-            snip.duration_ms = result['duration_ms']
+            log_collector.info(f"Playing song on device: {device_name}")
 
-            # Result
-            log_collector.info(f"Found song: {snip.song_name} - {snip.song_artist}")
+            # Calculate safe position (play last 31 seconds of the song)
+            position_ms = max(0, snip.duration_ms - config.app_config.playback_offset_ms)
 
-            # Play song
-            try:
-                # Get and activate preferred device
-                active_device_id, device_name = get_and_activate_spotify_device(
-                    sp,
-                    preferred_name=config.app_config.preferred_device_name
-                )
+            # Start playback with volume at 0 (silent playback)
+            playback_success = spotify_service.start_playback(
+                track_uri=snip.song_uri,
+                device_id=active_device_id,
+                position_ms=position_ms,
+                volume=0
+            )
 
-                if not active_device_id:
-                    log_collector.info("No Spotify devices available - skipping playback")
-                    valid_snippet = False
-                    continue
-
-                log_collector.info(f"Playing song on device: {device_name}")
-
-                # Calculate safe position (prevent negative position_ms)
-                # Play last 31 seconds of the song
-                position_ms = max(0, snip.duration_ms - config.app_config.playback_offset_ms)
-
-                sp.start_playback(
-                    device_id=active_device_id,
-                    uris=[snip.song_uri],
-                    position_ms=position_ms
-                )
-
-                # Always keep volume at 0 (silent playback)
-                sp.volume(0, device_id=active_device_id)
-
+            if playback_success:
                 # Add to queue AFTER successful playback
                 queue.append(snip.track_string)
+                snip.mark_queued()
                 log_collector.info("Successfully played and added to queue")
-
-            except Exception as e:
-                log_collector.error(f"Cannot play song, with exception: {str(e)}")
+            else:
+                log_collector.error("Playback failed")
                 valid_snippet = False
-                # Continue to next iteration
 
         # Update counter and sleep if there will be more loops
         cnt += 1
@@ -357,34 +282,34 @@ def start_loop():
 # Functionality:
 ##### pick a filename and see if shazam recognizes it
 @app.route('/test_shazam')
-async def test_shazam():
-    filepath = 'song_snippets/test_snippet_20230524_131852.wav' # the breeze - dr dog
+def test_shazam():
+    """Test Shazam recognition on a sample file."""
+    filepath = 'song_snippets/test_snippet_20230524_131852.wav'  # the breeze - dr dog
     # filepath = 'song_snippets/test_snippet_20230524_132647.wav' #random shit
 
+    recognition_service = RecognitionService()
+    recognized_track = recognition_service.recognize(filepath)
 
-    loop = asyncio.get_event_loop()
-    trackdata, track_string = loop.run_until_complete(shazam_get_trackdata(filepath))
-
-    return track_string
+    if recognized_track:
+        return recognized_track.track_string
+    else:
+        return "Song not recognized"
 
 
 @app.route('/test_spotify')
 def test_spotify():
     """Test Spotify connection with auto-activation of preferred device."""
     try:
-        cid = config.cid
-        secret = config.secret
-        scope = 'user-modify-playback-state user-read-playback-state'
-        sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-            client_id=cid,
-            client_secret=secret,
+        # Create Spotify service
+        spotify_service = SpotifyService(
+            client_id=config.cid,
+            client_secret=config.secret,
             redirect_uri='https://github.com/kennygrosz/silent-disco',
-            scope=scope
-        ))
+            scope='user-modify-playback-state user-read-playback-state'
+        )
 
         # Get and activate preferred device
-        device_id, device_name = get_and_activate_spotify_device(
-            sp,
+        device_id, device_name = spotify_service.get_and_activate_device(
             preferred_name=config.app_config.preferred_device_name
         )
 
@@ -395,15 +320,19 @@ def test_spotify():
                 "preferred_device": config.app_config.preferred_device_name
             }, 404
 
-        # Start playback test
-        sp.start_playback(
+        # Start playback test with silent volume
+        playback_success = spotify_service.start_playback(
+            track_uri='spotify:track:0UV5zxRMz6AO4ZwUOZNIKI',
             device_id=device_id,
-            uris=['spotify:track:0UV5zxRMz6AO4ZwUOZNIKI'],
-            position_ms=150000
+            position_ms=150000,
+            volume=0
         )
 
-        # Always keep volume at 0 (silent playback)
-        sp.volume(0, device_id=device_id)
+        if not playback_success:
+            return {
+                "status": "error",
+                "message": "Playback failed"
+            }, 500
 
         return {
             "status": "success",
