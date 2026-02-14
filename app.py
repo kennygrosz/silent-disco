@@ -180,12 +180,13 @@ def start_loop():
     ######
     # LOOP  
     #####
-    cnt = 0
+    cnt=0
+    should_continue = True
 
     print_log(log, "Beginning loop, Iteration = "+str(cnt))
 
 
-    while cnt <= total_loops:
+    while should_continue:
         valid_snippet = True
         interruption_allowed_flag = False  # Initialize
 
@@ -319,7 +320,6 @@ def start_loop():
         cnt += 1
 
         # Check if we should continue (time-based or infinite mode)
-        should_continue = True
         if total_recording_time is not None:
             should_continue = cnt <= total_loops
         # If total_recording_time is None, loop runs indefinitely (should_continue stays True)
