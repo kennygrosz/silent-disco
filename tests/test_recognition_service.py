@@ -33,7 +33,7 @@ class TestRecognitionService:
     @patch('services.recognition_service.Shazam')
     def test_recognize_found(self, mock_shazam_cls, valid_shazam_response):
         mock_shazam = MagicMock()
-        mock_shazam.recognize_song = AsyncMock(return_value=valid_shazam_response)
+        mock_shazam.recognize = AsyncMock(return_value=valid_shazam_response)
         mock_shazam_cls.return_value = mock_shazam
 
         service = RecognitionService()
@@ -47,7 +47,7 @@ class TestRecognitionService:
     @patch('services.recognition_service.Shazam')
     def test_recognize_not_found(self, mock_shazam_cls):
         mock_shazam = MagicMock()
-        mock_shazam.recognize_song = AsyncMock(return_value={'matches': []})
+        mock_shazam.recognize = AsyncMock(return_value={'matches': []})
         mock_shazam_cls.return_value = mock_shazam
 
         service = RecognitionService()
@@ -57,7 +57,7 @@ class TestRecognitionService:
     @patch('services.recognition_service.Shazam')
     def test_recognize_api_error(self, mock_shazam_cls):
         mock_shazam = MagicMock()
-        mock_shazam.recognize_song = AsyncMock(side_effect=Exception("Shazam API error"))
+        mock_shazam.recognize = AsyncMock(side_effect=Exception("Shazam API error"))
         mock_shazam_cls.return_value = mock_shazam
 
         service = RecognitionService()

@@ -49,7 +49,7 @@ class RecognitionService:
         """
         try:
             logger.debug(f"Recognizing audio: {audio_filepath}")
-            alldata = await self.shazam.recognize_song(audio_filepath)
+            alldata = await self.shazam.recognize(audio_filepath)
 
             if 'track' in alldata:
                 # Get artist and track data
