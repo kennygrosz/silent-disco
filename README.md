@@ -114,7 +114,7 @@ Create a Spotify app at https://developer.spotify.com/dashboard and add your cre
 ```env
 SPOTIFY_CLIENT_ID=your_client_id_here
 SPOTIFY_CLIENT_SECRET=your_client_secret_here
-SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8888/callback
 SPOTIFY_DEFAULT_DEVICE_ID=          # Optional: leave empty to auto-select
 SPOTIFY_PREFERRED_DEVICE=           # Optional: e.g., "Kenny's MacBook Air"
 ```
