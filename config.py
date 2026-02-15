@@ -52,7 +52,7 @@ class AppConfig:
     duplicate_check_size: int = 10
     playback_offset_ms: int = 31000
     volume_preview: int = 40
-    preferred_device_name: str = "Kenny's MacBook Air"  # Preferred Spotify playback device
+    preferred_device_name: str = os.getenv('SPOTIFY_PREFERRED_DEVICE', '')
 
 
 # Global configuration instances
