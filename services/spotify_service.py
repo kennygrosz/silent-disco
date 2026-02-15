@@ -24,6 +24,7 @@ class SpotifyTrack:
     name: str
     artist: str
     duration_ms: int
+    album_art_url: Optional[str] = None
 
     @classmethod
     def from_api_response(cls, track_data: Dict[str, Any]) -> 'SpotifyTrack':
@@ -41,12 +42,21 @@ class SpotifyTrack:
         # Validate track data has required fields
         validated = validate_spotify_track(track_data)
 
+        # Extract album art URL (get medium size image)
+        album_art_url = None
+        if 'album' in validated and 'images' in validated['album']:
+            images = validated['album']['images']
+            if images:
+                # Get medium size image (usually index 1) or first available
+                album_art_url = images[1]['url'] if len(images) > 1 else images[0]['url']
+
         return cls(
             id=validated['id'],
             uri=validated['uri'],
             name=validated['name'],
             artist=validated['artists'][0]['name'],
-            duration_ms=validated['duration_ms']
+            duration_ms=validated['duration_ms'],
+            album_art_url=album_art_url
         )
 
 

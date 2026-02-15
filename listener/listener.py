@@ -1,13 +1,14 @@
 import pyaudio
-import wave 
+import wave
 
 
-def record_audio(filename, duration):
+def record_audio(filename, duration, stop_event=None):
     """Record audio from the default input device.
 
     Args:
         filename: Path where the WAV file will be saved
         duration: Recording duration in seconds
+        stop_event: Optional threading.Event to interrupt recording early
 
     Returns:
         str: Success message with file path
@@ -40,10 +41,19 @@ def record_audio(filename, duration):
 
         print(f"Recording started. Listening for {RECORD_SECONDS} seconds...")
 
-        # Record audio
-        for _ in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+        # Record audio (check stop_event each chunk for interruptibility)
+        total_chunks = int(RATE / CHUNK * RECORD_SECONDS)
+        stopped_early = False
+        for _ in range(total_chunks):
+            if stop_event and stop_event.is_set():
+                print("Recording interrupted by stop request.")
+                stopped_early = True
+                break
             data = stream.read(CHUNK, exception_on_overflow=False)
             frames.append(data)
+
+        if stopped_early:
+            return "Recording interrupted."
 
         print("Recording finished.")
 

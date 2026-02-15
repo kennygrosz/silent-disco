@@ -55,6 +55,7 @@ class Snippet:
     song_name: Optional[str] = None
     song_artist: Optional[str] = None
     duration_ms: Optional[int] = None
+    album_art_url: Optional[str] = None
 
     def __post_init__(self):
         """Initialize computed fields."""
@@ -144,7 +145,8 @@ class Snippet:
         song_uri: str,
         song_name: str,
         song_artist: str,
-        duration_ms: int
+        duration_ms: int,
+        album_art_url: Optional[str] = None
     ):
         """Set Spotify track information.
 
@@ -154,12 +156,14 @@ class Snippet:
             song_name: Song name
             song_artist: Artist name
             duration_ms: Song duration in milliseconds
+            album_art_url: URL to album art image
         """
         self.song_id = song_id
         self.song_uri = song_uri
         self.song_name = song_name
         self.song_artist = song_artist
         self.duration_ms = duration_ms
+        self.album_art_url = album_art_url
 
     def __repr__(self) -> str:
         """String representation of Snippet."""

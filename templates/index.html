@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silent Disco - Vinyl Companion</title>
+    <!-- Google Fonts - Retro Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        /* === THEME VARIABLES === */
+        :root {
+            /* Retro/Vinyl Color Palette */
+            --vinyl-black: #1a1a1a;
+            --vinyl-dark: #2d2d2d;
+            --warm-brown: #5d4e37;
+            --vintage-orange: #ff8c42;
+            --vintage-red: #d64933;
+            --warm-cream: #f4e8d8;
+            --gold: #d4af37;
+
+            /* Status colors */
+            --success-green: #4caf50;
+            --error-red: #f44336;
+            --listening-pulse: #ff6b6b;
+
+            /* Spacing - optimized for MacBook screen */
+            --spacing-xs: 0.3rem;
+            --spacing-sm: 0.6rem;
+            --spacing-md: 0.9rem;
+            --spacing-lg: 1.2rem;
+            --spacing-xl: 1.5rem;
+        }
+
+        /* === GLOBAL STYLES === */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Audiowide', 'Orbitron', sans-serif;
+            background: linear-gradient(135deg, var(--vinyl-black) 0%, var(--vinyl-dark) 100%);
+            color: var(--warm-cream);
+            height: 100vh;
+            padding: var(--spacing-sm);
+            overflow: hidden;
+            max-width: 1300px;
+            margin: 0 auto;
+            transition: box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.recording {
+            box-shadow: inset 0 0 80px rgba(214, 73, 51, 0.15);
+        }
+
+        /* === HEADER === */
+        .header {
+            text-align: center;
+            margin-bottom: var(--spacing-xs);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: var(--vintage-orange);
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.1em;
+            margin-bottom: 0;
+        }
+
+        .header .subtitle {
+            font-size: 0.85rem;
+            color: var(--warm-cream);
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        /* === STATUS INDICATOR === */
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xs);
+            padding: var(--spacing-xs) var(--spacing-md);
+            background: rgba(255, 140, 66, 0.1);
+            border-radius: 8px;
+            border: 2px solid var(--vintage-orange);
+            flex-shrink: 0;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--success-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        .status-dot.listening {
+            background: var(--listening-pulse);
+        }
+
+        .status-dot.recording {
+            background: var(--error-red);
+            animation: pulse-fast 0.8s infinite;
+        }
+
+        .status-dot.processing {
+            background: var(--gold);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.waiting {
+            background: var(--success-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+        }
+
+        /* === MAIN LAYOUT === */
+        .main-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-xs);
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* === NOW PLAYING CARD === */
+        .now-playing {
+            background: linear-gradient(145deg, var(--warm-brown) 0%, var(--vinyl-dark) 100%);
+            padding: var(--spacing-sm);
+            border-radius: 15px;
+            border: 3px solid var(--gold);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .now-playing::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.1) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .track-info-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .now-playing-label {
+            font-size: 1rem;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .track-name {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--warm-cream);
+            margin-bottom: var(--spacing-xs);
+            line-height: 1.2;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .track-artist {
+            font-size: 1.3rem;
+            color: var(--vintage-orange);
+            font-style: italic;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .no-track {
+            font-size: 1.3rem;
+            color: var(--warm-cream);
+            opacity: 0.5;
+            font-style: italic;
+        }
+
+        /* === VISUALIZER === */
+        .visualizer-container {
+            background: rgba(26, 26, 26, 0.9);
+            padding: var(--spacing-xs);
+            border-radius: 15px;
+            border: 3px solid var(--vintage-orange);
+            margin-top: var(--spacing-xs);
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .visualizer-label {
+            font-size: 0.9rem;
+            color: var(--vintage-orange);
+            margin-bottom: var(--spacing-sm);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        #visualizer {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            background: radial-gradient(circle at center, rgba(26, 26, 26, 0.5), rgba(0, 0, 0, 0.9));
+            display: block;
+        }
+
+        /* Vinyl record styling for default state */
+        .vinyl-record {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #0a0a0a 100%);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8),
+                        inset 0 0 40px rgba(0, 0, 0, 0.6);
+            animation: vinyl-spin 4s linear infinite;
+        }
+
+        .vinyl-grooves {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: repeating-radial-gradient(circle at center,
+                transparent 0px,
+                transparent 2px,
+                rgba(255, 255, 255, 0.02) 2px,
+                rgba(255, 255, 255, 0.02) 4px
+            );
+        }
+
+        .vinyl-center {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 40% 40%, var(--vintage-orange), var(--vintage-red));
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+        }
+
+        .vinyl-center::before {
+            content: '';
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #0a0a0a;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .vinyl-label {
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            z-index: 1;
+        }
+
+        @keyframes vinyl-spin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* === HISTORY PANEL === */
+        .history-panel {
+            background: linear-gradient(145deg, var(--vinyl-dark) 0%, var(--vinyl-black) 100%);
+            padding: var(--spacing-sm);
+            border-radius: 15px;
+            border: 3px solid var(--warm-brown);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .history-title {
+            font-size: 1.2rem;
+            color: var(--gold);
+            margin-bottom: var(--spacing-md);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            border-bottom: 2px solid var(--warm-brown);
+            padding-bottom: var(--spacing-sm);
+        }
+
+        .history-item {
+            background: rgba(93, 78, 55, 0.3);
+            padding: var(--spacing-sm);
+            margin-bottom: var(--spacing-sm);
+            border-radius: 8px;
+            border-left: 4px solid var(--vintage-orange);
+            transition: all 0.3s ease;
+            display: flex;
+            gap: var(--spacing-sm);
+            align-items: center;
+        }
+
+        .history-item:hover {
+            background: rgba(93, 78, 55, 0.5);
+            border-left-color: var(--gold);
+            transform: translateX(5px);
+        }
+
+        .history-item .album-art-small {
+            width: 50px;
+            height: 50px;
+            border-radius: 5px;
+            background: var(--vinyl-black);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .history-item .album-art-small img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+
+        .history-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .history-item .track-name-small {
+            font-size: 1rem;
+            color: var(--warm-cream);
+            font-weight: bold;
+            margin-bottom: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-item .track-artist-small {
+            font-size: 0.85rem;
+            color: var(--vintage-orange);
+            font-style: italic;
+            margin-bottom: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-item .timestamp {
+            font-size: 0.75rem;
+            color: var(--warm-cream);
+            opacity: 0.6;
+        }
+
+        .spotify-badge {
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 4px;
+            flex-shrink: 0;
+        }
+
+        .history-item.unrecognized {
+            opacity: 0.5;
+            border-left-color: var(--warm-cream);
+        }
+
+        .history-item.unrecognized .album-art-small {
+            opacity: 0.5;
+        }
+
+        /* === CONTROLS === */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--spacing-sm);
+            margin-top: var(--spacing-xs);
+            flex-shrink: 0;
+        }
+
+        .btn {
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-size: 1rem;
+            font-family: 'Audiowide', 'Orbitron', sans-serif;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(145deg, var(--vintage-orange), var(--vintage-red));
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(145deg, var(--warm-brown), var(--vinyl-dark));
+            color: var(--warm-cream);
+            border: 2px solid var(--gold);
+        }
+
+        .btn-success {
+            background: linear-gradient(145deg, var(--success-green), #388e3c);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* === SCROLLBAR === */
+        .history-panel::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .history-panel::-webkit-scrollbar-track {
+            background: rgba(26, 26, 26, 0.5);
+            border-radius: 10px;
+        }
+
+        .history-panel::-webkit-scrollbar-thumb {
+            background: var(--warm-brown);
+            border-radius: 10px;
+        }
+
+        .history-panel::-webkit-scrollbar-thumb:hover {
+            background: var(--vintage-orange);
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+
+            .track-name {
+                font-size: 1.5rem;
+            }
+
+            .track-artist {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <h1>🎵 SILENT DISCO</h1>
+        <div class="subtitle">Vinyl Companion for Spotify</div>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div class="status-dot listening"></div>
+            <span>Listening...</span>
+        </div>
+        <div class="status-indicator">
+            <span>Next recording in: <strong>45s</strong></span>
+        </div>
+        <div class="status-indicator">
+            <span>Device: <strong>Kenny's MacBook Air</strong></span>
+        </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <div class="main-container">
+        <!-- NOW PLAYING + VISUALIZER -->
+        <div class="left-column">
+            <div class="now-playing">
+                <div class="track-info-container">
+                    <div class="now-playing-label">♪ Now Playing</div>
+                    <div class="track-name">Blue in Green</div>
+                    <div class="track-artist">Miles Davis</div>
+                </div>
+            </div>
+
+            <div class="visualizer-container">
+                <div class="visualizer-label">Audio Visualizer</div>
+                <canvas id="visualizer"></canvas>
+            </div>
+        </div>
+
+        <!-- HISTORY PANEL -->
+        <div class="history-panel">
+            <div class="history-title">Recent Tracks</div>
+
+            <div class="history-item">
+                <div class="album-art-small">🎵</div>
+                <div class="history-item-info">
+                    <div class="track-name-small">Blue in Green</div>
+                    <div class="track-artist-small">Miles Davis</div>
+                    <div class="timestamp">2 minutes ago</div>
+                </div>
+            </div>
+
+            <div class="history-item">
+                <div class="album-art-small">🎺</div>
+                <div class="history-item-info">
+                    <div class="track-name-small">So What</div>
+                    <div class="track-artist-small">Miles Davis</div>
+                    <div class="timestamp">1 hour ago</div>
+                </div>
+            </div>
+
+            <div class="history-item">
+                <div class="album-art-small">🎹</div>
+                <div class="history-item-info">
+                    <div class="track-name-small">Take Five</div>
+                    <div class="track-artist-small">Dave Brubeck</div>
+                    <div class="timestamp">1 hour ago</div>
+                </div>
+            </div>
+
+            <div class="history-item unrecognized">
+                <div class="album-art-small">❓</div>
+                <div class="history-item-info">
+                    <div class="track-name-small">Unrecognized</div>
+                    <div class="track-artist-small">Could not identify</div>
+                    <div class="timestamp">2 hours ago</div>
+                </div>
+            </div>
+
+            <div class="history-item">
+                <div class="album-art-small">🎷</div>
+                <div class="history-item-info">
+                    <div class="track-name-small">My Favorite Things</div>
+                    <div class="track-artist-small">John Coltrane</div>
+                    <div class="timestamp">2 hours ago</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls" id="controls">
+        <button class="btn btn-primary" id="btn-stop">⏸ Stop Listening</button>
+        <button class="btn btn-secondary" id="btn-retry">🔄 Retry Recognition</button>
+        <button class="btn btn-secondary" id="btn-test">🎧 Test Spotify</button>
+    </div>
+
+    <script>
+        // === PSYCHEDELIC ALBUM ART VISUALIZER ===
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Mood-based color palettes
+        const moods = {
+            energetic: { colors: [0, 30, 60], saturation: 100, lightness: 60 }, // Reds/Oranges
+            calm: { colors: [180, 210, 240], saturation: 80, lightness: 55 }, // Blues
+            chill: { colors: [120, 150, 180], saturation: 70, lightness: 60 }, // Greens/Blues
+            happy: { colors: [40, 55, 70], saturation: 95, lightness: 65 }, // Yellows/Golds
+            intense: { colors: [280, 310, 340], saturation: 90, lightness: 55 } // Purples/Magentas
+        };
+
+        // Current state
+        let time = 0;
+        let audioData = new Array(128).fill(0).map(() => Math.random());
+        let particles = [];
+        let currentMood = moods.energetic; // Change based on song
+        let hasTrack = true; // Set to false to show vinyl
+        let vinylRotation = 0;
+        let albumArtRotation = 0; // Rotation angle for spinning album art
+        let albumArtImage = null; // Store loaded album art image
+
+        // Particle class
+        class Particle {
+            constructor(colorPalette) {
+                this.reset(colorPalette);
+            }
+
+            reset(colorPalette) {
+                this.angle = Math.random() * Math.PI * 2;
+                this.radius = 120 + Math.random() * 50;
+                this.speed = Math.random() * 0.5 + 0.3;
+                this.size = Math.random() * 4 + 1;
+                this.hue = colorPalette.colors[Math.floor(Math.random() * colorPalette.colors.length)];
+                this.life = 1.0;
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.angle += 0.01;
+                this.life -= 0.004;
+
+                if (this.life <= 0 || this.radius > 250) {
+                    this.reset(currentMood);
+                }
+            }
+
+            draw(cx, cy) {
+                const x = cx + Math.cos(this.angle) * this.radius;
+                const y = cy + Math.sin(this.angle) * this.radius;
+
+                ctx.save();
+                ctx.globalAlpha = this.life * 0.7;
+                ctx.fillStyle = `hsl(${this.hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = `hsl(${this.hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
+                ctx.beginPath();
+                ctx.arc(x, y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Initialize particles
+        for (let i = 0; i < 60; i++) {
+            particles.push(new Particle(currentMood));
+        }
+
+        // Smooth audio data update
+        function updateAudioData() {
+            for (let i = 0; i < audioData.length; i++) {
+                const target = Math.random() * 0.6 + 0.4;
+                audioData[i] += (target - audioData[i]) * 0.12;
+            }
+        }
+
+        // Draw spinning vinyl record (default state)
+        function drawVinylRecord(cx, cy) {
+            vinylRotation += 0.5;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(vinylRotation * Math.PI / 180);
+
+            // Vinyl outer disc
+            const vinylGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 100);
+            vinylGradient.addColorStop(0, '#1a1a1a');
+            vinylGradient.addColorStop(1, '#0a0a0a');
+            ctx.fillStyle = vinylGradient;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 100, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Vinyl grooves
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            for (let r = 30; r < 100; r += 3) {
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Center label
+            const labelGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 40);
+            labelGradient.addColorStop(0, '#ff8c42');
+            labelGradient.addColorStop(1, '#d64933');
+            ctx.fillStyle = labelGradient;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff8c42';
+            ctx.beginPath();
+            ctx.arc(0, 0, 40, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Center hole
+            ctx.fillStyle = '#0a0a0a';
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // "SILENT DISCO" text
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 9px Audiowide';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('SILENT', 0, -8);
+            ctx.fillText('DISCO', 0, 8);
+
+            ctx.restore();
+        }
+
+        // Draw album art spinning like a vinyl record
+        function drawAlbumArt(cx, cy) {
+            const radius = 90;
+            albumArtRotation += 0.4; // Spin speed (degrees per frame)
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(albumArtRotation * Math.PI / 180);
+
+            // Clip to circle
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+
+            // Draw actual album art if available
+            if (albumArtImage && albumArtImage.complete) {
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = `hsl(${currentMood.colors[0]}, ${currentMood.saturation}%, 50%)`;
+                ctx.drawImage(albumArtImage, -radius, -radius, radius * 2, radius * 2);
+            } else {
+                // Fallback gradient
+                const artGradient = ctx.createLinearGradient(-radius, -radius, radius, radius);
+                artGradient.addColorStop(0, `hsl(${currentMood.colors[0]}, ${currentMood.saturation}%, ${currentMood.lightness}%)`);
+                artGradient.addColorStop(0.5, `hsl(${currentMood.colors[1]}, ${currentMood.saturation}%, ${currentMood.lightness}%)`);
+                artGradient.addColorStop(1, `hsl(${currentMood.colors[2]}, ${currentMood.saturation}%, ${currentMood.lightness}%)`);
+                ctx.fillStyle = artGradient;
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = `hsl(${currentMood.colors[0]}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
+                ctx.fill();
+            }
+
+            ctx.restore();
+
+            // Draw vinyl grooves over the album art (outside clip)
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(albumArtRotation * Math.PI / 180);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
+            ctx.lineWidth = 1;
+            for (let r = 20; r < radius; r += 5) {
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Center spindle hole
+            ctx.fillStyle = '#0a0a0a';
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Outer ring border (non-rotating)
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = `hsl(${currentMood.colors[0]}, ${currentMood.saturation}%, 50%)`;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw circular spectrum bars
+        function drawCircularSpectrum(cx, cy, startRadius) {
+            const bars = 80;
+            const angleStep = (Math.PI * 2) / bars;
+
+            for (let i = 0; i < bars; i++) {
+                const angle = i * angleStep;
+                const value = audioData[i % audioData.length];
+                const barHeight = value * 80;
+
+                const x1 = cx + Math.cos(angle) * startRadius;
+                const y1 = cy + Math.sin(angle) * startRadius;
+                const x2 = cx + Math.cos(angle) * (startRadius + barHeight);
+                const y2 = cy + Math.sin(angle) * (startRadius + barHeight);
+
+                const colorIndex = Math.floor((i / bars) * currentMood.colors.length);
+                const hue = currentMood.colors[colorIndex] + (time * 0.2);
+
+                ctx.save();
+                ctx.strokeStyle = `hsla(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%, 0.7)`;
+                ctx.lineWidth = 5;
+                ctx.shadowBlur = 18;
+                ctx.shadowColor = `hsl(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Draw pulsing rings
+        function drawPulsingRings(cx, cy) {
+            const rings = 5;
+
+            for (let r = 0; r < rings; r++) {
+                const pulse = Math.sin(time * 0.05 + r * 0.5) * 10;
+                const radius = 130 + r * 25 + pulse;
+                const hue = currentMood.colors[r % currentMood.colors.length];
+
+                ctx.save();
+                ctx.strokeStyle = `hsla(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%, ${0.2 - r * 0.03})`;
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = `hsl(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Main render loop
+        function drawVisualizer() {
+            // Semi-transparent clear for trail effect
+            ctx.fillStyle = 'rgba(26, 26, 26, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            // Update state
+            updateAudioData();
+            time++;
+
+            // Draw background layers
+            drawPulsingRings(cx, cy);
+            drawCircularSpectrum(cx, cy, 120);
+
+            // Draw particles
+            particles.forEach(p => {
+                p.update();
+                p.draw(cx, cy);
+            });
+
+            // Draw center (album art or vinyl)
+            if (hasTrack) {
+                drawAlbumArt(cx, cy);
+            } else {
+                drawVinylRecord(cx, cy);
+            }
+
+            // Outer glow
+            const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 150);
+            const glowHue = currentMood.colors[Math.floor(time / 30) % currentMood.colors.length];
+            gradient.addColorStop(0, `hsla(${glowHue}, ${currentMood.saturation}%, ${currentMood.lightness}%, 0.15)`);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            requestAnimationFrame(drawVisualizer);
+        }
+
+        drawVisualizer();
+
+        // === SOCKET.IO CONNECTION ===
+        const socket = io();
+
+        // Update Now Playing section based on track state
+        function updateNowPlaying(track = null) {
+            const trackInfoContainer = document.querySelector('.track-info-container');
+
+            if (track) {
+                hasTrack = true;
+                trackInfoContainer.innerHTML = `
+                    <div class="now-playing-label">♪ ${track.blocked ? 'Recognized' : 'Now Playing'}</div>
+                    <div class="track-name">${track.name}</div>
+                    <div class="track-artist">${track.artist}</div>
+                `;
+
+                // Update mood if provided
+                if (track.mood && moods[track.mood]) {
+                    currentMood = moods[track.mood];
+                }
+
+                // Load album art if available
+                if (track.album_art_url) {
+                    albumArtImage = new Image();
+                    albumArtImage.crossOrigin = "anonymous";
+                    albumArtImage.src = track.album_art_url;
+                } else {
+                    albumArtImage = null;
+                }
+            } else {
+                hasTrack = false;
+                albumArtImage = null;
+                trackInfoContainer.innerHTML = `
+                    <div class="now-playing-label">♪ Now Playing</div>
+                    <div class="no-track">Waiting for music...</div>
+                `;
+            }
+        }
+
+        // Update history panel
+        function updateHistory(tracks) {
+            const historyPanel = document.querySelector('.history-panel');
+            const historyTitle = historyPanel.querySelector('.history-title');
+
+            // Clear existing items
+            historyPanel.innerHTML = '';
+            historyPanel.appendChild(historyTitle);
+
+            // Add tracks
+            tracks.forEach(track => {
+                const timeAgo = getTimeAgo(track.timestamp);
+                const item = document.createElement('div');
+                item.className = track.name === 'Unrecognized' ? 'history-item unrecognized' : 'history-item';
+                const spotifyBadge = track.played_on_spotify
+                    ? '<svg class="spotify-badge" viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="12" fill="#1DB954"/><path d="M16.5 15.5c-.2 0-.4-.1-.5-.2-2.1-1.3-4.8-1.6-7.9-.9-.3.1-.6-.1-.7-.4-.1-.3.1-.6.4-.7 3.4-.8 6.4-.4 8.8 1 .3.2.4.5.2.8-.1.2-.3.4-.3.4zm1.2-2.7c-.2 0-.4-.1-.6-.2-2.4-1.5-6-1.9-8.8-1-.3.1-.7-.1-.8-.4-.1-.3.1-.7.4-.8 3.2-1 7.2-.5 9.9 1.2.3.2.4.6.2.9-.1.2-.3.3-.3.3zm.1-2.8c-2.9-1.7-7.6-1.9-10.3-1-.4.1-.7-.1-.8-.5-.1-.4.1-.7.5-.8 3.2-1 8.4-.8 11.7 1.2.3.2.4.7.2 1-.2.2-.4.3-.5.3l.2-.2z" fill="white"/></svg>'
+                    : '';
+                item.innerHTML = `
+                    <div class="album-art-small">${track.album_art_url ? `<img src="${track.album_art_url}" alt="Album art">` : '🎵'}</div>
+                    <div class="history-item-info">
+                        <div class="track-name-small">${track.name} ${spotifyBadge}</div>
+                        <div class="track-artist-small">${track.artist}</div>
+                        <div class="timestamp">${timeAgo}</div>
+                    </div>
+                `;
+                historyPanel.appendChild(item);
+            });
+        }
+
+        // Get time ago string
+        function getTimeAgo(timestamp) {
+            const seconds = Math.floor((Date.now() / 1000) - timestamp);
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+            return `${Math.floor(seconds / 3600)} hours ago`;
+        }
+
+        // Update status bar
+        function updateStatus(data) {
+            const statusDot = document.querySelector('.status-dot');
+            const statusText = statusDot.nextElementSibling;
+            const nextRecordingElement = document.querySelectorAll('.status-indicator')[1];
+
+            // Handle status updates
+            if (data.status !== undefined || data.is_listening !== undefined) {
+                const status = data.status || (data.is_listening ? 'listening' : 'stopped');
+
+                // Remove all status classes
+                statusDot.classList.remove('listening', 'recording', 'processing', 'waiting');
+
+                // Update based on status
+                switch(status) {
+                    case 'recording':
+                        statusDot.classList.add('recording');
+                        statusText.textContent = '🔴 Recording...';
+                        document.body.classList.add('recording');
+                        // Hide countdown during recording
+                        nextRecordingElement.style.display = 'none';
+                        break;
+                    case 'processing':
+                        statusDot.classList.add('processing');
+                        statusText.textContent = '⚙️ Recognizing...';
+                        document.body.classList.remove('recording');
+                        // Hide countdown during processing
+                        nextRecordingElement.style.display = 'none';
+                        break;
+                    case 'waiting':
+                        statusDot.classList.add('waiting');
+                        statusText.textContent = '⏸ Waiting...';
+                        document.body.classList.remove('recording');
+                        // Show countdown during waiting
+                        nextRecordingElement.style.display = 'flex';
+                        break;
+                    case 'listening':
+                    case true:
+                        statusDot.classList.add('listening');
+                        statusText.textContent = 'Listening...';
+                        document.body.classList.remove('recording');
+                        // Show countdown
+                        nextRecordingElement.style.display = 'flex';
+                        setControlsLayout(true);
+                        break;
+                    case 'stopped':
+                    case false:
+                        statusText.textContent = 'Stopped';
+                        document.body.classList.remove('recording');
+                        nextRecordingElement.style.display = 'none';
+                        setControlsLayout(false);
+                        break;
+                }
+            }
+
+            // Update countdown (only when visible)
+            if (data.next_recording_in !== undefined) {
+                const nextRecordingSpan = nextRecordingElement.querySelector('span');
+                nextRecordingSpan.innerHTML = `Next recording in: <strong>${data.next_recording_in}s</strong>`;
+            }
+        }
+
+        // Socket.IO event handlers
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+
+        socket.on('audio_data', (data) => {
+            // Update audio data for visualizer
+            audioData = data.data;
+        });
+
+        socket.on('track_update', (data) => {
+            updateNowPlaying(data.track);
+        });
+
+        socket.on('history_update', (data) => {
+            updateHistory(data.tracks);
+        });
+
+        socket.on('status_update', (data) => {
+            updateStatus(data);
+        });
+
+        // Initial update
+        updateNowPlaying();
+
+        // === CONTROL BUTTON HANDLERS ===
+        const buttons = {
+            stop: document.getElementById('btn-stop'),
+            retry: document.getElementById('btn-retry'),
+            test: document.getElementById('btn-test')
+        };
+        const controlsContainer = document.getElementById('controls');
+
+        function setControlsLayout(isListening) {
+            if (isListening) {
+                // 3-column: Stop | Retry | Test
+                controlsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+                buttons.retry.style.display = '';
+                buttons.stop.textContent = '⏸ Stop Listening';
+            } else {
+                // 2-column: Start (wide) | Test
+                controlsContainer.style.gridTemplateColumns = '2fr 1fr';
+                buttons.retry.style.display = 'none';
+                buttons.stop.textContent = '▶ Start Listening';
+            }
+        }
+
+        async function callAPI(endpoint, method = 'POST') {
+            try {
+                const response = await fetch(endpoint, { method });
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('API call failed:', error);
+                return { success: false, message: error.message };
+            }
+        }
+
+        buttons.stop.addEventListener('click', async () => {
+            const isListening = buttons.stop.textContent.includes('Stop');
+            const endpoint = isListening ? '/api/control/stop' : '/api/control/start';
+
+            // Immediate UI feedback
+            buttons.stop.disabled = true;
+            buttons.stop.textContent = isListening ? '⏳ Stopping...' : '⏳ Starting...';
+
+            const result = await callAPI(endpoint);
+            buttons.stop.disabled = false;
+            if (result.success) {
+                setControlsLayout(!isListening);
+            } else {
+                // Revert on failure
+                setControlsLayout(isListening);
+            }
+        });
+
+        buttons.retry.addEventListener('click', async () => {
+            buttons.retry.disabled = true;
+            buttons.retry.textContent = '🔄 Retrying...';
+
+            const result = await callAPI('/api/control/retry');
+
+            if (result.queued) {
+                buttons.retry.textContent = '🔄 Retry Queued...';
+                // Keep showing queued state longer
+                setTimeout(() => {
+                    buttons.retry.textContent = '🔄 Retry Recognition';
+                    buttons.retry.disabled = false;
+                }, 5000);
+            } else {
+                setTimeout(() => {
+                    buttons.retry.textContent = '🔄 Retry Recognition';
+                    buttons.retry.disabled = false;
+                }, 2000);
+            }
+        });
+
+        buttons.test.addEventListener('click', async () => {
+            buttons.test.disabled = true;
+            buttons.test.textContent = '🎧 Testing...';
+
+            const result = await callAPI('/api/control/test');
+
+            if (result.success) {
+                // Show success with device info
+                alert(`✓ Spotify Connected\n\nDevice: ${result.device}\nDevice ID: ${result.device_id}\nActive Session: ${result.has_active_session ? 'Yes' : 'No'}`);
+                buttons.test.textContent = '✓ Spotify OK';
+            } else {
+                // Show detailed error message
+                alert(`✗ Spotify Error\n\n${result.message}\n\nPlease check:\n- Spotify is open on a device\n- Device supports volume control\n- App has proper authentication`);
+                buttons.test.textContent = '✗ Spotify Error';
+                console.error('Spotify test failed:', result);
+            }
+
+            buttons.test.disabled = false;
+
+            setTimeout(() => {
+                buttons.test.textContent = '🎧 Test Spotify';
+            }, 3000);
+        });
+
+    </script>
+</body>
+</html>
