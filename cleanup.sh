@@ -24,9 +24,9 @@ echo "  Removed logs"
 rm -rf sandbox/
 echo "  Removed sandbox"
 
-# Cache files
-rm -rf .cache*
-echo "  Removed cache files"
+# Cache files (preserve .cache — Spotify auth token)
+find . -maxdepth 1 -name '.cache*' ! -name '.cache' -exec rm -rf {} +
+echo "  Removed cache files (kept Spotify token)"
 
 # macOS junk
 find . -name '.DS_Store' -delete 2>/dev/null || true
