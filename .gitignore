@@ -1,9 +1,33 @@
-silent-disco-env
-sandbox/song_snippets
-*.wav
-*.ipynbcheckpoints
-*.DS_Store
-*.cpython*
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+silent-disco-env/
+
+# Environment variables
 .env
-.cache
+
+# Audio snippets (generated at runtime)
+song_snippets/
+song_snippets_test/
+*.wav
+
+# Logs
 logs/
+
+# Sandbox / experiments
+sandbox/
+
+# Cache files
+.cache*
+
+# macOS
+.DS_Store
+
+# IDE / tools
+.claude/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/

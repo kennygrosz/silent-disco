@@ -78,8 +78,8 @@ class SilentDiscoApp:
 
         # Create Spotify service
         self.spotify_service = SpotifyService(
-            client_id=config.cid,
-            client_secret=config.secret,
+            client_id=config.spotify_config.client_id,
+            client_secret=config.spotify_config.client_secret,
             redirect_uri='https://github.com/kennygrosz/silent-disco',
             scope='user-modify-playback-state user-read-playback-state'
         )
@@ -182,6 +182,15 @@ class SilentDiscoApp:
         # TODO: Implement mood detection based on Spotify audio features
         return 'energetic'  # Default mood
 
+    def _cleanup_snippet_file(self, filepath):
+        """Delete a snippet WAV file after processing."""
+        try:
+            if filepath and os.path.exists(filepath):
+                os.remove(filepath)
+                self.log_collector.info(f"Deleted snippet file: {filepath}")
+        except Exception as e:
+            self.log_collector.error(f"Failed to delete snippet: {e}")
+
     def process_snippet(self):
         """Process a single audio snippet."""
         valid_snippet = True
@@ -228,6 +237,14 @@ class SilentDiscoApp:
                 except Exception as e:
                     self.log_collector.error(f"Failed to resume audio streamer: {e}")
 
+        # From here on, ensure snippet file is cleaned up when done
+        try:
+            return self._process_recorded_snippet(snip)
+        finally:
+            self._cleanup_snippet_file(snip.filepath_str)
+
+    def _process_recorded_snippet(self, snip):
+        """Process a recorded snippet (recognition, search, playback)."""
         # 2. Recognize with Shazam
         self.log_collector.info("Processing snippet with Shazam")
         self.update_ui_status(is_listening='processing')  # Update to processing state
@@ -500,8 +517,8 @@ def test_spotify():
     """Test Spotify connection."""
     try:
         spotify_service = SpotifyService(
-            client_id=config.cid,
-            client_secret=config.secret,
+            client_id=config.spotify_config.client_id,
+            client_secret=config.spotify_config.client_secret,
             redirect_uri='https://github.com/kennygrosz/silent-disco',
             scope='user-modify-playback-state user-read-playback-state'
         )

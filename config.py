@@ -59,9 +59,3 @@ class AppConfig:
 # These will be initialized when the module is imported
 spotify_config = SpotifyConfig.from_env()
 app_config = AppConfig()
-
-
-# Legacy compatibility (for backwards compatibility during refactoring)
-# These will be removed in later phases
-cid = spotify_config.client_id
-secret = spotify_config.client_secret
