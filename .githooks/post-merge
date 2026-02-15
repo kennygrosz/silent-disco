@@ -1,0 +1,24 @@
+#!/bin/sh
+# Post-merge hook: clean up generated files and install dependencies after pull.
+
+echo ""
+echo "=== Post-pull setup ==="
+
+# Run cleanup script
+if [ -f ./cleanup.sh ]; then
+    echo "Running cleanup..."
+    bash ./cleanup.sh
+else
+    echo "Warning: cleanup.sh not found, skipping."
+fi
+
+# Install/update dependencies
+if [ -f requirements.txt ]; then
+    echo ""
+    echo "Installing dependencies..."
+    pip install -r requirements.txt -q
+    echo "Dependencies installed."
+fi
+
+echo ""
+echo "=== Setup complete ==="
