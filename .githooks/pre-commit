@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-commit hook: run test suite before allowing commit
+
+echo "Running tests..."
+python -m pytest --tb=short -q
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "Tests failed. Commit aborted."
+    echo "Fix the failing tests or use --no-verify to skip."
+    exit 1
+fi

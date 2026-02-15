@@ -985,7 +985,7 @@
                     <div class="history-item-info">
                         <div class="track-name-small">${track.name} ${spotifyBadge}</div>
                         <div class="track-artist-small">${track.artist}</div>
-                        <div class="timestamp">${timeAgo}</div>
+                        <div class="timestamp" data-timestamp="${track.timestamp}">${timeAgo}</div>
                     </div>
                 `;
                 historyPanel.appendChild(item);
@@ -999,6 +999,13 @@
             if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
             return `${Math.floor(seconds / 3600)} hours ago`;
         }
+
+        // Auto-refresh timestamps every 30 seconds
+        setInterval(() => {
+            document.querySelectorAll('.timestamp[data-timestamp]').forEach(el => {
+                el.textContent = getTimeAgo(parseFloat(el.dataset.timestamp));
+            });
+        }, 30000);
 
         // Update status bar
         function updateStatus(data) {
