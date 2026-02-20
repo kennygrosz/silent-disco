@@ -43,9 +43,10 @@ def set_app_controller(controller):
 
 # Audio streaming for visualizer
 class AudioStreamer:
-    def __init__(self, rate=44100, chunk=2048):
+    def __init__(self, rate=44100, chunk=2048, frame_skip=2):
         self.rate = rate
         self.chunk = chunk
+        self.frame_skip = frame_skip  # Only process FFT every Nth frame to reduce CPU
         self.is_streaming = False
         self._stream = None
         self._p = None
@@ -104,41 +105,51 @@ class AudioStreamer:
                 frames_per_buffer=self.chunk
             )
 
+            import os
+            frame_count = 0
+            frame_skip = self.frame_skip  # Use configurable frame skip rate
+
             while self.is_streaming:
                 try:
                     # Read audio data
                     data = self._stream.read(self.chunk, exception_on_overflow=False)
-                    audio_data = np.frombuffer(data, dtype=np.int16)
+                    
+                    # Only process FFT every Nth frame to reduce CPU usage
+                    if frame_count % frame_skip == 0:
+                        audio_data = np.frombuffer(data, dtype=np.int16)
 
-                    # Convert to frequency domain (FFT)
-                    fft = np.fft.fft(audio_data)
-                    freqs = np.abs(fft[:len(fft)//2])
+                        # Convert to frequency domain (FFT)
+                        fft = np.fft.fft(audio_data)
+                        freqs = np.abs(fft[:len(fft)//2])
 
-                    # Normalize and downsample to 128 bars
-                    normalized = freqs / np.max(freqs) if np.max(freqs) > 0 else freqs
-                    downsampled = np.interp(
-                        np.linspace(0, len(normalized)-1, 128),
-                        np.arange(len(normalized)),
-                        normalized
-                    )
+                        # Normalize and downsample to 128 bars
+                        normalized = freqs / np.max(freqs) if np.max(freqs) > 0 else freqs
+                        downsampled = np.interp(
+                            np.linspace(0, len(normalized)-1, 128),
+                            np.arange(len(normalized)),
+                            normalized
+                        )
 
-                    # Send to all connected clients
-                    socketio.emit('audio_data', {
-                        'data': downsampled.tolist()
-                    })
+                        # Send to all connected clients
+                        socketio.emit('audio_data', {
+                            'data': downsampled.tolist()
+                        })
+
+                    frame_count += 1
 
                 except Exception as e:
                     if self.is_streaming:
                         logger.error(f"Error reading audio: {e}")
 
                 time.sleep(0.05)  # ~20 FPS
+                os.sched_yield()  # Yield CPU to prevent excessive spinning
 
         except Exception as e:
             logger.error(f"Audio streaming error: {e}")
         finally:
             self._cleanup_audio()
 
-audio_streamer = AudioStreamer()
+audio_streamer = AudioStreamer(frame_skip=3)  # Aggressive CPU optimization: process FFT every 3rd frame
 
 
 # Routes
@@ -147,6 +158,17 @@ def index():
     """Serve the main UI."""
     from flask import make_response
     response = make_response(render_template('index.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@app.route('/analytics')
+def analytics():
+    """Serve the analytics dashboard."""
+    from flask import make_response
+    response = make_response(render_template('analytics.html'))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'

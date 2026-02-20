@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd \"/Users/kennygrosz/Google Drive/4\\. Projects/H\\. Silent Disco/silent-disco\" && source silent-disco-env/bin/activate && timeout 30 python -m cProfile -o profile\\.out app_integrated\\.py 2>&1 \\|\\| true$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
