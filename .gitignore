@@ -28,6 +28,13 @@ sandbox/
 
 # IDE / tools
 .claude/
+.vscode/
+
+# Profiling and coverage
+profile.out
+profile_app.py
+.coverage
+coverage_html_report/
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
