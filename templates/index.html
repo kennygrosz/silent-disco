@@ -986,28 +986,61 @@
             const historyPanel = document.querySelector('.history-panel');
             const historyTitle = historyPanel.querySelector('.history-title');
 
-            // Clear existing items
-            historyPanel.innerHTML = '';
-            historyPanel.appendChild(historyTitle);
+            // Optimize: Check if history already exists to avoid full rebuild
+            const existingItems = historyPanel.querySelectorAll('.history-item');
+            
+            if (existingItems.length === 0) {
+                // First time: build from scratch
+                historyPanel.innerHTML = '';
+                historyPanel.appendChild(historyTitle);
 
-            // Add tracks
-            tracks.forEach(track => {
-                const timeAgo = getTimeAgo(track.timestamp);
+                // Add tracks
+                tracks.forEach(track => {
+                    const timeAgo = getTimeAgo(track.timestamp);
+                    const item = document.createElement('div');
+                    item.className = track.name === 'Unrecognized' ? 'history-item unrecognized' : 'history-item';
+                    const spotifyBadge = track.played_on_spotify
+                        ? '<svg class="spotify-badge" viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="12" fill="#1DB954"/><path d="M16.5 15.5c-.2 0-.4-.1-.5-.2-2.1-1.3-4.8-1.6-7.9-.9-.3.1-.6-.1-.7-.4-.1-.3.1-.6.4-.7 3.4-.8 6.4-.4 8.8 1 .3.2.4.5.2.8-.1.2-.3.4-.3.4zm1.2-2.7c-.2 0-.4-.1-.6-.2-2.4-1.5-6-1.9-8.8-1-.3.1-.7-.1-.8-.4-.1-.3.1-.7.4-.8 3.2-1 7.2-.5 9.9 1.2.3.2.4.6.2.9-.1.2-.3.3-.3.3zm.1-2.8c-2.9-1.7-7.6-1.9-10.3-1-.4.1-.7-.1-.8-.5-.1-.4.1-.7.5-.8 3.2-1 8.4-.8 11.7 1.2.3.2.4.7.2 1-.2.2-.4.3-.5.3l.2-.2z" fill="white"/></svg>'
+                        : '';
+                    item.innerHTML = `
+                        <div class="album-art-small">${track.album_art_url ? `<img src="${track.album_art_url}" alt="Album art">` : '🎵'}</div>
+                        <div class="history-item-info">
+                            <div class="track-name-small">${track.name} ${spotifyBadge}</div>
+                            <div class="track-artist-small">${track.artist}</div>
+                            <div class="timestamp" data-timestamp="${track.timestamp}">${timeAgo}</div>
+                        </div>
+                    `;
+                    historyPanel.appendChild(item);
+                });
+            } else if (tracks.length > existingItems.length) {
+                // New track arrived - prepend it instead of rebuilding all
+                const newTrack = tracks[0];
+                const timeAgo = getTimeAgo(newTrack.timestamp);
                 const item = document.createElement('div');
-                item.className = track.name === 'Unrecognized' ? 'history-item unrecognized' : 'history-item';
-                const spotifyBadge = track.played_on_spotify
+                item.className = newTrack.name === 'Unrecognized' ? 'history-item unrecognized' : 'history-item';
+                const spotifyBadge = newTrack.played_on_spotify
                     ? '<svg class="spotify-badge" viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="12" fill="#1DB954"/><path d="M16.5 15.5c-.2 0-.4-.1-.5-.2-2.1-1.3-4.8-1.6-7.9-.9-.3.1-.6-.1-.7-.4-.1-.3.1-.6.4-.7 3.4-.8 6.4-.4 8.8 1 .3.2.4.5.2.8-.1.2-.3.4-.3.4zm1.2-2.7c-.2 0-.4-.1-.6-.2-2.4-1.5-6-1.9-8.8-1-.3.1-.7-.1-.8-.4-.1-.3.1-.7.4-.8 3.2-1 7.2-.5 9.9 1.2.3.2.4.6.2.9-.1.2-.3.3-.3.3zm.1-2.8c-2.9-1.7-7.6-1.9-10.3-1-.4.1-.7-.1-.8-.5-.1-.4.1-.7.5-.8 3.2-1 8.4-.8 11.7 1.2.3.2.4.7.2 1-.2.2-.4.3-.5.3l.2-.2z" fill="white"/></svg>'
                     : '';
                 item.innerHTML = `
-                    <div class="album-art-small">${track.album_art_url ? `<img src="${track.album_art_url}" alt="Album art">` : '🎵'}</div>
+                    <div class="album-art-small">${newTrack.album_art_url ? `<img src="${newTrack.album_art_url}" alt="Album art">` : '🎵'}</div>
                     <div class="history-item-info">
-                        <div class="track-name-small">${track.name} ${spotifyBadge}</div>
-                        <div class="track-artist-small">${track.artist}</div>
-                        <div class="timestamp" data-timestamp="${track.timestamp}">${timeAgo}</div>
+                        <div class="track-name-small">${newTrack.name} ${spotifyBadge}</div>
+                        <div class="track-artist-small">${newTrack.artist}</div>
+                        <div class="timestamp" data-timestamp="${newTrack.timestamp}">${timeAgo}</div>
                     </div>
                 `;
-                historyPanel.appendChild(item);
-            });
+                
+                // Insert after title
+                const firstItem = historyPanel.querySelector('.history-item');
+                historyPanel.insertBefore(item, firstItem);
+                
+                // Remove oldest if we exceed limit (keeping only 20)
+                const allItems = historyPanel.querySelectorAll('.history-item');
+                if (allItems.length > 20) {
+                    allItems[allItems.length - 1].remove();
+                }
+            }
+        }
         }
 
         // Get time ago string

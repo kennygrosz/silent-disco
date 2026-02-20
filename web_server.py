@@ -340,14 +340,14 @@ def update_current_track(track_data):
             **track_data,
             'timestamp': time.time()
         })
+        # Only send history update if there's a new item (not a duplicate)
+        socketio.emit('history_update', {
+            'tracks': list(app_state.track_history)
+        })
 
-    # Broadcast to all clients
+    # Broadcast track update
     socketio.emit('track_update', {
         'track': track_data
-    })
-
-    socketio.emit('history_update', {
-        'tracks': list(app_state.track_history)
     })
 
 

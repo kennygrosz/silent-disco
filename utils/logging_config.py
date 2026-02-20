@@ -8,6 +8,7 @@ import logging
 import os
 from datetime import datetime
 from typing import Optional
+from collections import deque
 
 
 def setup_logger(
@@ -91,17 +92,18 @@ def get_logger(name: str = "silent_disco") -> logging.Logger:
 class LogCollector:
     """Collects log messages in memory for returning as API response.
 
-    This maintains backward compatibility with the original log list approach
-    while also using proper Python logging.
+    Uses a bounded deque to prevent unbounded memory growth.
+    Keeps the last 500 log messages for API responses.
     """
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, logger: Optional[logging.Logger] = None, max_messages: int = 500):
         """Initialize log collector.
 
         Args:
             logger: Logger to use (default: get_logger())
+            max_messages: Maximum number of messages to keep in memory (default: 500)
         """
-        self.messages = []
+        self.messages = deque(maxlen=max_messages)  # Bounded to prevent memory leak
         self.logger = logger or get_logger()
 
     def info(self, message: str):
@@ -126,6 +128,6 @@ class LogCollector:
         """Get all collected log messages.
 
         Returns:
-            List of log message strings
+            List of log message strings (last 500 messages)
         """
-        return self.messages
+        return list(self.messages)
