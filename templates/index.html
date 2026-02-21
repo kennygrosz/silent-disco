@@ -521,6 +521,34 @@
             background: var(--vintage-orange);
         }
 
+        /* === DISCONNECTED BANNER === */
+        .disconnected-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(214, 73, 51, 0.9),
+                rgba(214, 73, 51, 0.9) 10px,
+                rgba(180, 50, 30, 0.9) 10px,
+                rgba(180, 50, 30, 0.9) 20px
+            );
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-size: 0.9rem;
+            font-family: 'Audiowide', sans-serif;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            z-index: 9999;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .disconnected-banner.hidden {
+            display: none;
+        }
+
         /* === RESPONSIVE === */
         @media (max-width: 1200px) {
             .main-container {
@@ -538,6 +566,9 @@
     </style>
 </head>
 <body>
+    <!-- DISCONNECTED BANNER -->
+    <div class="disconnected-banner" id="disconnected-banner">NOT CONNECTED — Server offline or JS failed to load</div>
+
     <!-- HEADER -->
     <div class="header">
         <h1>🎵 SILENT DISCO</h1>
@@ -995,7 +1026,6 @@
                 }
             }
         }
-        }
 
         // Get time ago string
         function getTimeAgo(timestamp) {
@@ -1075,12 +1105,16 @@
         }
 
         // Socket.IO event handlers
+        const banner = document.getElementById('disconnected-banner');
+
         socket.on('connect', () => {
             console.log('Connected to server');
+            banner.classList.add('hidden');
         });
 
         socket.on('disconnect', () => {
             console.log('Disconnected from server');
+            banner.classList.remove('hidden');
         });
 
         socket.on('audio_data', (data) => {

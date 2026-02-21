@@ -546,8 +546,65 @@ def test_spotify():
         }, 500
 
 
+def check_environment():
+    """Verify that critical packages are installed and compatible.
+
+    Returns True if everything looks good, or exits with a clear error message.
+    """
+    errors = []
+
+    # Check Python version
+    if sys.version_info < (3, 10):
+        errors.append(
+            f"Python >= 3.10 required, got {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        )
+
+    # Check critical packages and their APIs
+    critical_packages = {
+        'shazamio': '0.7.0',
+        'pyaudio': '0.2.14',
+        'flask': None,
+        'flask_socketio': None,
+        'spotipy': None,
+        'numpy': None,
+    }
+
+    for pkg, expected_version in critical_packages.items():
+        try:
+            mod = __import__(pkg)
+            if expected_version:
+                installed = getattr(mod, '__version__', getattr(mod, 'VERSION', None))
+                if installed and installed != expected_version:
+                    errors.append(
+                        f"{pkg} version mismatch: need {expected_version}, got {installed}"
+                    )
+        except ImportError:
+            errors.append(f"{pkg} is not installed")
+
+    # Check shazamio has the recognize() method we use
+    try:
+        from shazamio import Shazam
+        if not hasattr(Shazam(), 'recognize'):
+            errors.append(
+                "shazamio.Shazam is missing 'recognize' method — "
+                "installed version is too old. Run: pip install shazamio==0.7.0"
+            )
+    except ImportError:
+        pass  # Already caught above
+
+    if errors:
+        print("\n!! Environment check failed:\n")
+        for e in errors:
+            print(f"   - {e}")
+        print(f"\nFix with: pip install -r requirements.txt")
+        print(f"Python:   {sys.executable}\n")
+        sys.exit(1)
+
+
 def main():
     """Main entry point."""
+    check_environment()
+
     parser = argparse.ArgumentParser(description='Silent Disco - Vinyl Companion for Spotify')
     parser.add_argument('--no-ui', action='store_true', help='Disable web UI (UI enabled by default)')
     parser.add_argument('--port', type=int, default=5002, help='Web UI port (default: 5002)')
