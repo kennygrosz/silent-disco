@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 echo "Cleaning up Silent Disco repo..."
 
 # Audio snippets
-rm -rf song_snippets/*.wav song_snippets_test/
+rm -rf song_snippets/*.wav
 echo "  Removed audio snippets"
 
 # Python caches
@@ -20,10 +20,6 @@ echo "  Removed Python caches"
 rm -rf logs/
 echo "  Removed logs"
 
-# Sandbox experiments
-rm -rf sandbox/
-echo "  Removed sandbox"
-
 # Cache files (preserve .cache — Spotify auth token)
 find . -maxdepth 1 -name '.cache*' ! -name '.cache' -exec rm -rf {} +
 echo "  Removed cache files (kept Spotify token)"
@@ -31,10 +27,6 @@ echo "  Removed cache files (kept Spotify token)"
 # macOS junk
 find . -name '.DS_Store' -delete 2>/dev/null || true
 echo "  Removed .DS_Store files"
-
-# Jupyter checkpoints
-rm -rf .ipynb_checkpoints/
-echo "  Removed Jupyter checkpoints"
 
 # Recreate song_snippets dir (needed at runtime)
 mkdir -p song_snippets

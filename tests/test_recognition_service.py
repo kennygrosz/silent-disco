@@ -5,6 +5,32 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from services.recognition_service import RecognizedTrack, RecognitionService
 
 
+class TestShazamioContract:
+    """Contract tests that verify the real shazamio library (no mocking).
+
+    These catch version/API mismatches between our code and the installed package.
+    """
+
+    def test_shazam_importable(self):
+        from shazamio import Shazam
+        assert Shazam is not None
+
+    def test_shazam_has_recognize_method(self):
+        from shazamio import Shazam
+        shazam = Shazam()
+        assert hasattr(shazam, 'recognize'), (
+            "Shazam is missing 'recognize' method — "
+            "installed shazamio version may be too old"
+        )
+
+    def test_shazamio_version(self):
+        from importlib.metadata import version
+        installed = version('shazamio')
+        assert installed == '0.7.0', (
+            f"Expected shazamio 0.7.0, got {installed}"
+        )
+
+
 class TestRecognizedTrack:
     def test_artist_property(self):
         track = RecognizedTrack(

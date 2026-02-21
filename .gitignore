@@ -11,14 +11,10 @@ silent-disco-env/
 
 # Audio snippets (generated at runtime)
 song_snippets/
-song_snippets_test/
 *.wav
 
 # Logs
 logs/
-
-# Sandbox / experiments
-sandbox/
 
 # Cache files
 .cache*
@@ -30,11 +26,6 @@ sandbox/
 .claude/
 .vscode/
 
-# Profiling and coverage
-profile.out
-profile_app.py
+# Coverage
 .coverage
 coverage_html_report/
-
-# Jupyter checkpoints
-.ipynb_checkpoints/

@@ -268,12 +268,26 @@
             letter-spacing: 0.15em;
         }
 
+        #visualizer-glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            filter: blur(14px);
+            opacity: 0.55;
+            pointer-events: none;
+        }
+
         #visualizer {
+            position: relative;
             width: 100%;
             height: 100%;
             border-radius: 10px;
             background: radial-gradient(circle at center, rgba(26, 26, 26, 0.5), rgba(0, 0, 0, 0.9));
             display: block;
+            z-index: 1;
         }
 
         /* Vinyl record styling for default state */
@@ -603,6 +617,7 @@
 
             <div class="visualizer-container">
                 <div class="visualizer-label">Audio Visualizer</div>
+                <canvas id="visualizer-glow"></canvas>
                 <canvas id="visualizer"></canvas>
             </div>
         </div>
@@ -624,11 +639,15 @@
         // === PSYCHEDELIC ALBUM ART VISUALIZER ===
         const canvas = document.getElementById('visualizer');
         const ctx = canvas.getContext('2d');
+        const glowCanvas = document.getElementById('visualizer-glow');
+        const glowCtx = glowCanvas.getContext('2d');
 
         // Set canvas size
         function resizeCanvas() {
             canvas.width = canvas.offsetWidth;
             canvas.height = canvas.offsetHeight;
+            glowCanvas.width = canvas.width;
+            glowCanvas.height = canvas.height;
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
@@ -644,7 +663,9 @@
 
         // Current state
         let time = 0;
-        let audioData = new Array(128).fill(0).map(() => Math.random());
+        let audioData = new Array(128).fill(0).map((_, i) => 0.35 + 0.15 * Math.sin(i * 0.2));
+        let targetAudioData = new Array(128).fill(0).map((_, i) => 0.35 + 0.15 * Math.sin(i * 0.2));
+        let hasRealAudio = false;
         let particles = [];
         let currentMood = moods.energetic; // Change based on song
         let hasTrack = true; // Set to false to show vinyl
@@ -660,7 +681,7 @@
 
             reset(colorPalette) {
                 this.angle = Math.random() * Math.PI * 2;
-                this.radius = 120 + Math.random() * 50;
+                this.radius = 170 + Math.random() * 80;
                 this.speed = Math.random() * 0.5 + 0.3;
                 this.size = Math.random() * 4 + 1;
                 this.hue = colorPalette.colors[Math.floor(Math.random() * colorPalette.colors.length)];
@@ -672,7 +693,7 @@
                 this.angle += 0.01;
                 this.life -= 0.004;
 
-                if (this.life <= 0 || this.radius > 250) {
+                if (this.life <= 0 || this.radius > 375) {
                     this.reset(currentMood);
                 }
             }
@@ -681,29 +702,32 @@
                 const x = cx + Math.cos(this.angle) * this.radius;
                 const y = cy + Math.sin(this.angle) * this.radius;
 
-                ctx.save();
                 ctx.globalAlpha = this.life * 0.7;
-                ctx.fillStyle = `hsl(${this.hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
-                ctx.shadowBlur = 12;
-                ctx.shadowColor = `hsl(${this.hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
+                ctx.fillStyle = `hsl(${this.hue}, ${currentMood.saturation}%, ${currentMood.lightness + 15}%)`;
                 ctx.beginPath();
                 ctx.arc(x, y, this.size, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
             }
         }
 
         // Initialize particles
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 40; i++) {
             particles.push(new Particle(currentMood));
         }
 
-        // Smooth audio data update
+        // Smooth audio data toward real audio (or ambient idle)
         function updateAudioData() {
             for (let i = 0; i < audioData.length; i++) {
-                const target = Math.random() * 0.6 + 0.4;
-                audioData[i] += (target - audioData[i]) * 0.12;
+                audioData[i] += (targetAudioData[i] - audioData[i]) * 0.25;
             }
+            // When no real audio, drift toward gentle ambient movement
+            if (!hasRealAudio) {
+                for (let i = 0; i < targetAudioData.length; i++) {
+                    const ambient = 0.35 + 0.15 * Math.sin(time * 0.03 + i * 0.2);
+                    targetAudioData[i] += (ambient - targetAudioData[i]) * 0.05;
+                }
+            }
+            hasRealAudio = false;
         }
 
         // Draw spinning vinyl record (default state)
@@ -715,59 +739,56 @@
             ctx.rotate(vinylRotation * Math.PI / 180);
 
             // Vinyl outer disc
-            const vinylGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 100);
+            const vinylGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 150);
             vinylGradient.addColorStop(0, '#1a1a1a');
             vinylGradient.addColorStop(1, '#0a0a0a');
             ctx.fillStyle = vinylGradient;
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
             ctx.beginPath();
-            ctx.arc(0, 0, 100, 0, Math.PI * 2);
+            ctx.arc(0, 0, 150, 0, Math.PI * 2);
             ctx.fill();
 
             // Vinyl grooves
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
             ctx.lineWidth = 1;
-            for (let r = 30; r < 100; r += 3) {
+            for (let r = 45; r < 150; r += 8) {
                 ctx.beginPath();
                 ctx.arc(0, 0, r, 0, Math.PI * 2);
                 ctx.stroke();
             }
 
             // Center label
-            const labelGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 40);
+            const labelGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 60);
             labelGradient.addColorStop(0, '#ff8c42');
             labelGradient.addColorStop(1, '#d64933');
             ctx.fillStyle = labelGradient;
             ctx.shadowBlur = 15;
             ctx.shadowColor = '#ff8c42';
             ctx.beginPath();
-            ctx.arc(0, 0, 40, 0, Math.PI * 2);
+            ctx.arc(0, 0, 60, 0, Math.PI * 2);
             ctx.fill();
+            ctx.shadowBlur = 0;
 
             // Center hole
             ctx.fillStyle = '#0a0a0a';
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
             ctx.beginPath();
-            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.arc(0, 0, 12, 0, Math.PI * 2);
             ctx.fill();
 
             // "SILENT DISCO" text
             ctx.shadowBlur = 0;
             ctx.fillStyle = 'white';
-            ctx.font = 'bold 9px Audiowide';
+            ctx.font = 'bold 16px Audiowide';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('SILENT', 0, -8);
-            ctx.fillText('DISCO', 0, 8);
+            ctx.fillText('SILENT', 0, -12);
+            ctx.fillText('DISCO', 0, 12);
 
             ctx.restore();
         }
 
         // Draw album art spinning like a vinyl record
         function drawAlbumArt(cx, cy) {
-            const radius = 90;
+            const radius = 135;
             albumArtRotation += 0.4; // Spin speed (degrees per frame)
 
             ctx.save();
@@ -782,8 +803,6 @@
 
             // Draw actual album art if available
             if (albumArtImage && albumArtImage.complete) {
-                ctx.shadowBlur = 25;
-                ctx.shadowColor = `hsl(${currentMood.colors[0]}, ${currentMood.saturation}%, 50%)`;
                 ctx.drawImage(albumArtImage, -radius, -radius, radius * 2, radius * 2);
             } else {
                 // Fallback gradient
@@ -792,8 +811,6 @@
                 artGradient.addColorStop(0.5, `hsl(${currentMood.colors[1]}, ${currentMood.saturation}%, ${currentMood.lightness}%)`);
                 artGradient.addColorStop(1, `hsl(${currentMood.colors[2]}, ${currentMood.saturation}%, ${currentMood.lightness}%)`);
                 ctx.fillStyle = artGradient;
-                ctx.shadowBlur = 25;
-                ctx.shadowColor = `hsl(${currentMood.colors[0]}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
                 ctx.fill();
             }
 
@@ -813,8 +830,6 @@
 
             // Center spindle hole
             ctx.fillStyle = '#0a0a0a';
-            ctx.shadowBlur = 4;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
             ctx.beginPath();
             ctx.arc(0, 0, 6, 0, Math.PI * 2);
             ctx.fill();
@@ -823,9 +838,9 @@
             // Outer ring border (non-rotating)
             ctx.save();
             ctx.translate(cx, cy);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.strokeStyle = `hsla(${currentMood.colors[0]}, ${currentMood.saturation}%, 50%, 0.5)`;
             ctx.lineWidth = 3;
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 12;
             ctx.shadowColor = `hsl(${currentMood.colors[0]}, ${currentMood.saturation}%, 50%)`;
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -838,10 +853,14 @@
             const bars = 80;
             const angleStep = (Math.PI * 2) / bars;
 
+            ctx.save();
+            ctx.lineWidth = 5;
+
             for (let i = 0; i < bars; i++) {
                 const angle = i * angleStep;
-                const value = audioData[i % audioData.length];
-                const barHeight = value * 80;
+                const raw = audioData[i % audioData.length];
+                const value = Math.max(raw, 0.25 + 0.1 * Math.sin(time * 0.03 + i * 0.3));
+                const barHeight = value * 130;
 
                 const x1 = cx + Math.cos(angle) * startRadius;
                 const y1 = cy + Math.sin(angle) * startRadius;
@@ -851,42 +870,60 @@
                 const colorIndex = Math.floor((i / bars) * currentMood.colors.length);
                 const hue = currentMood.colors[colorIndex] + (time * 0.2);
 
-                ctx.save();
-                ctx.strokeStyle = `hsla(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%, 0.7)`;
-                ctx.lineWidth = 5;
-                ctx.shadowBlur = 18;
-                ctx.shadowColor = `hsl(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
+                ctx.strokeStyle = `hsla(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%, 0.8)`;
                 ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(x2, y2);
                 ctx.stroke();
-                ctx.restore();
             }
+
+            ctx.restore();
         }
 
         // Draw pulsing rings
         function drawPulsingRings(cx, cy) {
             const rings = 5;
 
+            ctx.save();
+            ctx.lineWidth = 3;
+
             for (let r = 0; r < rings; r++) {
                 const pulse = Math.sin(time * 0.05 + r * 0.5) * 10;
-                const radius = 130 + r * 25 + pulse;
+                const radius = 195 + r * 32 + pulse;
                 const hue = currentMood.colors[r % currentMood.colors.length];
 
-                ctx.save();
                 ctx.strokeStyle = `hsla(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%, ${0.2 - r * 0.03})`;
-                ctx.lineWidth = 3;
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = `hsl(${hue}, ${currentMood.saturation}%, ${currentMood.lightness}%)`;
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI * 2);
                 ctx.stroke();
-                ctx.restore();
             }
+
+            ctx.restore();
         }
 
         // Main render loop
-        function drawVisualizer() {
+        let lastFrameTime = 0;
+        let animationPaused = false;
+
+        // Pause animation when tab is not visible
+        document.addEventListener('visibilitychange', () => {
+            animationPaused = document.hidden;
+            if (!animationPaused) {
+                lastFrameTime = 0;
+                requestAnimationFrame(drawVisualizer);
+            }
+        });
+
+        function drawVisualizer(timestamp) {
+            if (animationPaused) return;
+
+            // Throttle to ~30fps
+            if (timestamp - lastFrameTime < 33) {
+                requestAnimationFrame(drawVisualizer);
+                return;
+            }
+            lastFrameTime = timestamp;
+
             // Semi-transparent clear for trail effect
             ctx.fillStyle = 'rgba(26, 26, 26, 0.2)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -900,13 +937,16 @@
 
             // Draw background layers
             drawPulsingRings(cx, cy);
-            drawCircularSpectrum(cx, cy, 120);
+            drawCircularSpectrum(cx, cy, 180);
 
             // Draw particles
+            ctx.save();
             particles.forEach(p => {
                 p.update();
                 p.draw(cx, cy);
             });
+            ctx.globalAlpha = 1.0;
+            ctx.restore();
 
             // Draw center (album art or vinyl)
             if (hasTrack) {
@@ -916,17 +956,21 @@
             }
 
             // Outer glow
-            const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 150);
+            const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 225);
             const glowHue = currentMood.colors[Math.floor(time / 30) % currentMood.colors.length];
             gradient.addColorStop(0, `hsla(${glowHue}, ${currentMood.saturation}%, ${currentMood.lightness}%, 0.15)`);
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Copy to glow canvas (CSS blur creates the glow effect via GPU)
+            glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+            glowCtx.drawImage(canvas, 0, 0);
+
             requestAnimationFrame(drawVisualizer);
         }
 
-        drawVisualizer();
+        requestAnimationFrame(drawVisualizer);
 
         // === SOCKET.IO CONNECTION ===
         const socket = io();
@@ -1118,8 +1162,9 @@
         });
 
         socket.on('audio_data', (data) => {
-            // Update audio data for visualizer
-            audioData = data.data;
+            // Update target audio data for visualizer (smoothed in updateAudioData)
+            targetAudioData = data.data;
+            hasRealAudio = true;
         });
 
         socket.on('track_update', (data) => {
