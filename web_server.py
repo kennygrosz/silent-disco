@@ -194,6 +194,24 @@ def get_history():
     })
 
 
+@app.route('/api/analytics')
+def get_analytics():
+    """Get analytics data for the dashboard."""
+    if (app_state.app_controller
+            and hasattr(app_state.app_controller, 'analytics_db')
+            and app_state.app_controller.analytics_db):
+        data = app_state.app_controller.analytics_db.get_analytics()
+        return jsonify(data)
+    return jsonify({
+        'total_snippets': 0, 'recognized_count': 0,
+        'unrecognized_count': 0, 'failed_count': 0,
+        'played_count': 0, 'session_count': 0, 'recognition_rate': 0,
+        'top_artists': [], 'top_songs': [],
+        'by_hour': [0] * 24, 'by_day': [0] * 7,
+        'album_art_urls': [], 'sessions': [],
+    })
+
+
 @app.route('/api/control/start', methods=['POST'])
 def start_listening():
     """Start the listening loop."""

@@ -282,25 +282,25 @@
     <div class="header">
         <a href="/" class="nav-link">Back to Main</a>
         <h1>SILENT DISCO - Analytics</h1>
-        <a href="#" class="nav-link" onclick="location.reload()">Refresh</a>
+        <a href="#" class="nav-link" id="refresh-btn">Refresh</a>
     </div>
 
     <!-- STATS CARDS -->
     <div class="stats-row">
         <div class="stat-card">
-            <div class="stat-value">247</div>
+            <div class="stat-value" id="stat-snippets">0</div>
             <div class="stat-label">Total Snippets</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">78%</div>
+            <div class="stat-value" id="stat-rate">0%</div>
             <div class="stat-label">Recognition Rate</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">142</div>
+            <div class="stat-value" id="stat-played">0</div>
             <div class="stat-label">Songs Played</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">18</div>
+            <div class="stat-value" id="stat-sessions">0</div>
             <div class="stat-label">Sessions</div>
         </div>
     </div>
@@ -315,69 +315,7 @@
         </div>
         <div class="card">
             <div class="card-title">Top Songs</div>
-            <div class="song-item">
-                <span class="song-rank">1</span>
-                <div class="song-art"><img src="https://i.scdn.co/image/ab67616d00004851c9bdd59ff7e2d2a2e tried48e67d" alt="" onerror="this.parentElement.textContent='🎵'"></div>
-                <div class="song-info">
-                    <div class="song-name">Blue in Green</div>
-                    <div class="song-artist">Miles Davis</div>
-                </div>
-                <span class="song-count">12x</span>
-            </div>
-            <div class="song-item">
-                <span class="song-rank">2</span>
-                <div class="song-art">🎵</div>
-                <div class="song-info">
-                    <div class="song-name">So What</div>
-                    <div class="song-artist">Miles Davis</div>
-                </div>
-                <span class="song-count">9x</span>
-            </div>
-            <div class="song-item">
-                <span class="song-rank">3</span>
-                <div class="song-art">🎵</div>
-                <div class="song-info">
-                    <div class="song-name">Take Five</div>
-                    <div class="song-artist">Dave Brubeck</div>
-                </div>
-                <span class="song-count">7x</span>
-            </div>
-            <div class="song-item">
-                <span class="song-rank">4</span>
-                <div class="song-art">🎵</div>
-                <div class="song-info">
-                    <div class="song-name">My Favorite Things</div>
-                    <div class="song-artist">John Coltrane</div>
-                </div>
-                <span class="song-count">6x</span>
-            </div>
-            <div class="song-item">
-                <span class="song-rank">5</span>
-                <div class="song-art">🎵</div>
-                <div class="song-info">
-                    <div class="song-name">Round Midnight</div>
-                    <div class="song-artist">Thelonious Monk</div>
-                </div>
-                <span class="song-count">5x</span>
-            </div>
-            <div class="song-item">
-                <span class="song-rank">6</span>
-                <div class="song-art">🎵</div>
-                <div class="song-info">
-                    <div class="song-name">Autumn Leaves</div>
-                    <div class="song-artist">Bill Evans</div>
-                </div>
-                <span class="song-count">4x</span>
-            </div>
-            <div class="song-item">
-                <span class="song-rank">7</span>
-                <div class="song-art">🎵</div>
-                <div class="song-info">
-                    <div class="song-name">A Love Supreme</div>
-                    <div class="song-artist">John Coltrane</div>
-                </div>
-                <span class="song-count">4x</span>
-            </div>
+            <div id="top-songs-list"></div>
         </div>
     </div>
 
@@ -404,35 +342,24 @@
             <div class="chart-container-small">
                 <canvas id="recognitionChart"></canvas>
             </div>
-            <div class="legend">
+            <div class="legend" id="recognition-legend">
                 <div class="legend-item">
                     <div class="legend-dot" style="background: #4caf50;"></div>
-                    <span>Recognized (78%)</span>
+                    <span id="legend-recognized">Recognized (0%)</span>
                 </div>
                 <div class="legend-item">
                     <div class="legend-dot" style="background: #ff8c42;"></div>
-                    <span>Unrecognized (18%)</span>
+                    <span id="legend-unrecognized">Unrecognized (0%)</span>
                 </div>
                 <div class="legend-item">
                     <div class="legend-dot" style="background: #f44336;"></div>
-                    <span>Failed (4%)</span>
+                    <span id="legend-failed">Failed (0%)</span>
                 </div>
             </div>
         </div>
         <div class="card">
             <div class="card-title">Album Art Wall</div>
-            <div class="art-wall">
-                <img src="https://i.scdn.co/image/ab67616d00004851e8b066f70c206551210d902b" alt="Album" onerror="this.style.background='var(--warm-brown)'">
-                <img src="https://i.scdn.co/image/ab67616d00004851b7a3449e66c12448b93aef13" alt="Album" onerror="this.style.background='var(--vintage-orange)'">
-                <img src="https://i.scdn.co/image/ab67616d000048514b3f03b5c tried8f0b7b0e" alt="Album" onerror="this.style.background='var(--gold)'">
-                <img src="https://i.scdn.co/image/ab67616d00004851d4daf28d55fe4197234b97f9" alt="Album" onerror="this.style.background='var(--vintage-red)'">
-                <img src="https://i.scdn.co/image/ab67616d000048516c7112082b63beefffe6ac6f" alt="Album" onerror="this.style.background='var(--warm-brown)'">
-                <img src="https://i.scdn.co/image/ab67616d00004851a7bf730a1b3b8a0c4f3c8f5c" alt="Album" onerror="this.style.background='var(--vintage-orange)'">
-                <img src="https://i.scdn.co/image/ab67616d00004851b5e1cc6e9df2e4f3a5ee4e7d" alt="Album" onerror="this.style.background='var(--gold)'">
-                <img src="https://i.scdn.co/image/ab67616d000048519e495fb707973f3768008b8c" alt="Album" onerror="this.style.background='var(--vintage-red)'">
-                <img src="https://i.scdn.co/image/ab67616d00004851f7db43292a6a99b21b51d5b4" alt="Album" onerror="this.style.background='var(--warm-brown)'">
-                <img src="https://i.scdn.co/image/ab67616d00004851c5d7d6c8c3e4f5a6b7c8d9e0" alt="Album" onerror="this.style.background='var(--vintage-orange)'">
-            </div>
+            <div class="art-wall" id="album-wall"></div>
         </div>
     </div>
 
@@ -449,43 +376,7 @@
                     <th>Played</th>
                 </tr>
             </thead>
-            <tbody>
-                <tr>
-                    <td>Feb 15, 2026 8:00 PM</td>
-                    <td>2h 15m</td>
-                    <td>32</td>
-                    <td>28</td>
-                    <td>22</td>
-                </tr>
-                <tr>
-                    <td>Feb 14, 2026 7:30 PM</td>
-                    <td>1h 45m</td>
-                    <td>24</td>
-                    <td>19</td>
-                    <td>16</td>
-                </tr>
-                <tr>
-                    <td>Feb 12, 2026 9:00 PM</td>
-                    <td>3h 10m</td>
-                    <td>48</td>
-                    <td>41</td>
-                    <td>35</td>
-                </tr>
-                <tr>
-                    <td>Feb 10, 2026 6:15 PM</td>
-                    <td>1h 20m</td>
-                    <td>18</td>
-                    <td>14</td>
-                    <td>11</td>
-                </tr>
-                <tr>
-                    <td>Feb 8, 2026 8:45 PM</td>
-                    <td>2h 30m</td>
-                    <td>38</td>
-                    <td>30</td>
-                    <td>24</td>
-                </tr>
-            </tbody>
+            <tbody id="session-body"></tbody>
         </table>
     </div>
 
@@ -495,113 +386,188 @@
         Chart.defaults.font.family = "'Audiowide', 'Orbitron', sans-serif";
         Chart.defaults.font.size = 10;
 
-        // Top Artists - Horizontal Bar
-        new Chart(document.getElementById('topArtistsChart'), {
-            type: 'bar',
-            data: {
-                labels: ['Miles Davis', 'John Coltrane', 'Dave Brubeck', 'Thelonious Monk', 'Bill Evans', 'Charles Mingus', 'Art Blakey'],
-                datasets: [{
-                    data: [21, 10, 7, 5, 4, 3, 2],
-                    backgroundColor: [
-                        '#ff8c42', '#d4af37', '#d64933', '#ff8c42', '#d4af37', '#d64933', '#ff8c42'
-                    ],
-                    borderRadius: 4,
-                    borderSkipped: false
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(93, 78, 55, 0.3)' },
-                        ticks: { stepSize: 5 }
-                    },
-                    y: {
-                        grid: { display: false }
+        const colors = ['#ff8c42', '#d4af37', '#d64933'];
+
+        // Chart instances (so we can destroy + recreate on refresh)
+        let charts = {};
+
+        function renderStats(data) {
+            document.getElementById('stat-snippets').textContent = data.total_snippets;
+            document.getElementById('stat-rate').textContent = data.recognition_rate + '%';
+            document.getElementById('stat-played').textContent = data.played_count;
+            document.getElementById('stat-sessions').textContent = data.session_count;
+        }
+
+        function renderTopArtists(artists) {
+            if (charts.artists) charts.artists.destroy();
+            charts.artists = new Chart(document.getElementById('topArtistsChart'), {
+                type: 'bar',
+                data: {
+                    labels: artists.map(a => a.artist),
+                    datasets: [{
+                        data: artists.map(a => a.count),
+                        backgroundColor: artists.map((_, i) => colors[i % 3]),
+                        borderRadius: 4, borderSkipped: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(93,78,55,0.3)' }, ticks: { stepSize: 1 } },
+                        y: { grid: { display: false } }
                     }
                 }
-            }
-        });
+            });
+        }
 
-        // Listening by Hour
-        new Chart(document.getElementById('hourChart'), {
-            type: 'bar',
-            data: {
-                labels: Array.from({length: 24}, (_, i) => `${i}:00`),
-                datasets: [{
-                    data: [0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 5, 4, 3, 2, 4, 5, 8, 12, 18, 24, 22, 15, 8, 2],
-                    backgroundColor: '#ff8c42',
-                    borderRadius: 2,
-                    borderSkipped: false
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: {
+        function renderTopSongs(songs) {
+            const el = document.getElementById('top-songs-list');
+            if (!songs.length) {
+                el.innerHTML = '<div style="opacity:0.5;font-size:0.8rem;padding:1rem;text-align:center">No songs yet</div>';
+                return;
+            }
+            el.innerHTML = songs.map((s, i) => `
+                <div class="song-item">
+                    <span class="song-rank">${i + 1}</span>
+                    <div class="song-art">${s.album_art_url
+                        ? '<img src="' + s.album_art_url + '" alt="" onerror="this.parentElement.textContent=\'&#127925;\'">'
+                        : '&#127925;'}</div>
+                    <div class="song-info">
+                        <div class="song-name">${s.name}</div>
+                        <div class="song-artist">${s.artist}</div>
+                    </div>
+                    <span class="song-count">${s.count}x</span>
+                </div>
+            `).join('');
+        }
+
+        function renderHourChart(byHour) {
+            if (charts.hour) charts.hour.destroy();
+            charts.hour = new Chart(document.getElementById('hourChart'), {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        data: byHour, backgroundColor: '#ff8c42',
+                        borderRadius: 2, borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: {
                             callback: function(val, idx) { return idx % 4 === 0 ? this.getLabelForValue(val) : ''; }
-                        }
-                    },
-                    y: {
-                        grid: { color: 'rgba(93, 78, 55, 0.3)' },
-                        beginAtZero: true
+                        }},
+                        y: { grid: { color: 'rgba(93,78,55,0.3)' }, beginAtZero: true }
                     }
                 }
-            }
-        });
+            });
+        }
 
-        // Listening by Day
-        new Chart(document.getElementById('dayChart'), {
-            type: 'bar',
-            data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                datasets: [{
-                    data: [12, 8, 15, 10, 28, 42, 35],
-                    backgroundColor: '#d4af37',
-                    borderRadius: 4,
-                    borderSkipped: false
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { display: false } },
-                    y: {
-                        grid: { color: 'rgba(93, 78, 55, 0.3)' },
-                        beginAtZero: true
+        function renderDayChart(byDay) {
+            if (charts.day) charts.day.destroy();
+            charts.day = new Chart(document.getElementById('dayChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        data: byDay, backgroundColor: '#d4af37',
+                        borderRadius: 4, borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { grid: { color: 'rgba(93,78,55,0.3)' }, beginAtZero: true }
                     }
                 }
+            });
+        }
+
+        function renderRecognitionChart(data) {
+            if (charts.recognition) charts.recognition.destroy();
+            const total = data.total_snippets || 1;
+            const recPct = Math.round(data.recognized_count / total * 100);
+            const unrecPct = Math.round(data.unrecognized_count / total * 100);
+            const failPct = Math.round(data.failed_count / total * 100);
+
+            document.getElementById('legend-recognized').textContent = `Recognized (${recPct}%)`;
+            document.getElementById('legend-unrecognized').textContent = `Unrecognized (${unrecPct}%)`;
+            document.getElementById('legend-failed').textContent = `Failed (${failPct}%)`;
+
+            charts.recognition = new Chart(document.getElementById('recognitionChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Recognized', 'Unrecognized', 'Failed'],
+                    datasets: [{
+                        data: [data.recognized_count, data.unrecognized_count, data.failed_count],
+                        backgroundColor: ['#4caf50', '#ff8c42', '#f44336'],
+                        borderColor: '#1a1a1a', borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    cutout: '60%', plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderAlbumWall(urls) {
+            const wall = document.getElementById('album-wall');
+            if (!urls.length) {
+                wall.innerHTML = '<div style="opacity:0.5;font-size:0.8rem;padding:1rem;text-align:center;grid-column:1/-1">No album art yet</div>';
+                return;
             }
+            const bgColors = ['var(--warm-brown)', 'var(--vintage-orange)', 'var(--gold)', 'var(--vintage-red)'];
+            wall.innerHTML = urls.map((url, i) =>
+                `<img src="${url}" alt="Album" onerror="this.style.background='${bgColors[i % 4]}'">`
+            ).join('');
+        }
+
+        function renderSessions(sessions) {
+            const tbody = document.getElementById('session-body');
+            if (!sessions.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="opacity:0.5;text-align:center">No sessions yet</td></tr>';
+                return;
+            }
+            tbody.innerHTML = sessions.map(s => `
+                <tr>
+                    <td>${s.date}</td>
+                    <td>${s.duration}</td>
+                    <td>${s.snippets}</td>
+                    <td>${s.recognized}</td>
+                    <td>${s.played}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadAnalytics() {
+            try {
+                const resp = await fetch('/api/analytics');
+                const data = await resp.json();
+                renderStats(data);
+                renderTopArtists(data.top_artists);
+                renderTopSongs(data.top_songs);
+                renderHourChart(data.by_hour);
+                renderDayChart(data.by_day);
+                renderRecognitionChart(data);
+                renderAlbumWall(data.album_art_urls);
+                renderSessions(data.sessions);
+            } catch (e) {
+                console.error('Failed to load analytics:', e);
+            }
+        }
+
+        document.getElementById('refresh-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            loadAnalytics();
         });
 
-        // Recognition Breakdown - Donut
-        new Chart(document.getElementById('recognitionChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Recognized', 'Unrecognized', 'Failed'],
-                datasets: [{
-                    data: [193, 44, 10],
-                    backgroundColor: ['#4caf50', '#ff8c42', '#f44336'],
-                    borderColor: '#1a1a1a',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '60%',
-                plugins: { legend: { display: false } }
-            }
-        });
+        loadAnalytics();
     </script>
 </body>
 </html>

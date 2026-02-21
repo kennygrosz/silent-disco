@@ -16,6 +16,7 @@ import config
 from models.snippet import Snippet
 from services.spotify_service import SpotifyService
 from services.recognition_service import RecognitionService
+from services.analytics_db import AnalyticsDB
 from utils.logging_config import LogCollector
 from utils.validators import (
     validate_duration,
@@ -67,6 +68,8 @@ class SilentDiscoApp:
         # Services (initialized in start())
         self.spotify_service = None
         self.recognition_service = None
+        self.analytics_db = None
+        self._current_session_id = None
 
         # Web server components
         self.web_server = None
@@ -182,6 +185,22 @@ class SilentDiscoApp:
         # TODO: Implement mood detection based on Spotify audio features
         return 'energetic'  # Default mood
 
+    def _record_snippet_to_db(self, snip):
+        """Record a processed snippet to the analytics database."""
+        if not self.analytics_db or not self._current_session_id:
+            return
+        try:
+            played = snip.state.value == 'queued'
+            blocked = snip.is_recognized and not played
+            self.analytics_db.record_snippet(
+                session_id=self._current_session_id,
+                snippet=snip,
+                played_on_spotify=played,
+                blocked=blocked,
+            )
+        except Exception as e:
+            self.log_collector.error(f"Failed to record snippet to DB: {e}")
+
     def _cleanup_snippet_file(self, filepath):
         """Delete a snippet WAV file after processing."""
         try:
@@ -200,48 +219,51 @@ class SilentDiscoApp:
         self.current_snippet = snip
         self.log_collector.info(f"Initialized Snippet at: {snip.filepath_str}")
 
-        # 1. Record audio
-        self.log_collector.info(f"Recording snippet: {snip.filename}")
-        self.update_ui_status(is_listening='recording')  # Update to recording state
-
-        # Pause audio streamer to avoid PyAudio conflict on macOS
-        if self.enable_ui and self.web_server:
-            try:
-                from web_server import audio_streamer
-                audio_streamer.stop()
-                self.log_collector.info("Audio streamer paused for recording")
-            except Exception as e:
-                self.log_collector.error(f"Failed to pause audio streamer: {e}")
-
         try:
-            from listener.listener import record_audio
-            status = record_audio(snip.filepath_str, snip.snippet_duration, stop_event=self._stop_event)
-            if self._stop_event.is_set():
-                self.log_collector.info("Recording was interrupted by stop")
-                snip.mark_failed()
-                return False
-            snip.mark_recorded()
-            self.log_collector.info(f"Recording completed: {status}")
-        except Exception as e:
-            self.log_collector.error(f"Recording failed: {e}")
-            snip.mark_failed()
-            self.update_ui_status(is_listening='waiting')  # Back to waiting
-            return False
-        finally:
-            # Resume audio streamer after recording
+            # 1. Record audio
+            self.log_collector.info(f"Recording snippet: {snip.filename}")
+            self.update_ui_status(is_listening='recording')  # Update to recording state
+
+            # Pause audio streamer to avoid PyAudio conflict on macOS
             if self.enable_ui and self.web_server:
                 try:
                     from web_server import audio_streamer
-                    audio_streamer.start()
-                    self.log_collector.info("Audio streamer resumed after recording")
+                    audio_streamer.stop()
+                    self.log_collector.info("Audio streamer paused for recording")
                 except Exception as e:
-                    self.log_collector.error(f"Failed to resume audio streamer: {e}")
+                    self.log_collector.error(f"Failed to pause audio streamer: {e}")
 
-        # From here on, ensure snippet file is cleaned up when done
-        try:
-            return self._process_recorded_snippet(snip)
+            try:
+                from listener.listener import record_audio
+                status = record_audio(snip.filepath_str, snip.snippet_duration, stop_event=self._stop_event)
+                if self._stop_event.is_set():
+                    self.log_collector.info("Recording was interrupted by stop")
+                    snip.mark_failed()
+                    return False
+                snip.mark_recorded()
+                self.log_collector.info(f"Recording completed: {status}")
+            except Exception as e:
+                self.log_collector.error(f"Recording failed: {e}")
+                snip.mark_failed()
+                self.update_ui_status(is_listening='waiting')  # Back to waiting
+                return False
+            finally:
+                # Resume audio streamer after recording
+                if self.enable_ui and self.web_server:
+                    try:
+                        from web_server import audio_streamer
+                        audio_streamer.start()
+                        self.log_collector.info("Audio streamer resumed after recording")
+                    except Exception as e:
+                        self.log_collector.error(f"Failed to resume audio streamer: {e}")
+
+            # From here on, ensure snippet file is cleaned up when done
+            try:
+                return self._process_recorded_snippet(snip)
+            finally:
+                self._cleanup_snippet_file(snip.filepath_str)
         finally:
-            self._cleanup_snippet_file(snip.filepath_str)
+            self._record_snippet_to_db(snip)
 
     def _process_recorded_snippet(self, snip):
         """Process a recorded snippet (recognition, search, playback)."""
@@ -374,6 +396,14 @@ class SilentDiscoApp:
         if not self.web_server:
             self.start_web_server()
 
+        # Initialize analytics database
+        if not self.analytics_db:
+            try:
+                self.analytics_db = AnalyticsDB()
+                self.log_collector.info("Analytics database initialized")
+            except Exception as e:
+                self.log_collector.error(f"Failed to initialize analytics DB: {e}")
+
         return True
 
     def run_loop(self, total_recording_time=None):
@@ -391,6 +421,14 @@ class SilentDiscoApp:
         self.is_running = True
         self._stop_event.clear()  # Reset stop event for fresh run
         self.update_ui_status(is_listening=True)
+
+        # Start analytics session
+        if self.analytics_db:
+            try:
+                self._current_session_id = self.analytics_db.start_session()
+                self.log_collector.info(f"Started analytics session {self._current_session_id}")
+            except Exception as e:
+                self.log_collector.error(f"Failed to start analytics session: {e}")
 
         cnt = 0
         self.log_collector.info("Starting main loop")
@@ -444,6 +482,16 @@ class SilentDiscoApp:
         finally:
             self.is_running = False
             self.update_ui_status(is_listening=False)
+
+            # End analytics session
+            if self.analytics_db and self._current_session_id:
+                try:
+                    self.analytics_db.end_session(self._current_session_id)
+                    self.log_collector.info(f"Ended analytics session {self._current_session_id}")
+                except Exception as e:
+                    self.log_collector.error(f"Failed to end analytics session: {e}")
+                self._current_session_id = None
+
             self.log_collector.info("Loop ended")
             print(f"\n✓ Processed {cnt} snippets\n")
 

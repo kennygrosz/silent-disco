@@ -26,6 +26,9 @@ logs/
 .claude/
 .vscode/
 
+# Analytics database (generated at runtime)
+data/
+
 # Coverage
 .coverage
 coverage_html_report/
